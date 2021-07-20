@@ -7,20 +7,25 @@ from asyncua import ua
 
 _logger = logging.getLogger('asyncua')
 
-def client_reader(client, idx, node_id):
-        var = client.get_node(ua.NodeId(1002, 2))
+def client_reader(client, idx, nodeid):
+        var = client.get_node(ua.NodeId(nodeid, idx))
         data = var.read_value()
         print('byte data is '+ data)
         return data
 def data_converter(bytes_raw, dict_converter):
-        data_bytes = bytes_raw[dict_converter.start,dict_converter.end]
+        data_bytes = bytes_raw[dict_converter["start"],dict_converter["end"]]
         data = int.from_bytes(data_bytes, byteorder='big',signed=True)
-        value = data * dict_converter.gradient
+        value = data * dict_converter["gradient"]
         print('byte data is '+ data)
-        return data
+        return value
 
 async def main():
-    _logger = logging.getLogger('asyncua')
+    nsidx = 6
+    nodeids = [32824, 98360, 163896] #[pressure pipe, #pressure tan level, temperature pipe]
+    dict_conv1 = {"nbytes":4, "rbytes":4, "start":2 , "end":16, "gradient":0.01, "conversion": 1}
+    dict_conv2 = {"nbytes":4, "rbytes":4, "start":2 , "end":16, "gradient":0.01, "conversion": 0.0254}
+    dict_conv3 = {"nbytes":2, "rbytes":2, "start":0 , "end":16, "gradient":0.1, "conversion": 1}
+    converters = [dict_conv1 , dict_conv2, dict_conv3]
     # setup our server
     server = Server()
     await server.init()
@@ -30,42 +35,23 @@ async def main():
     idx = await server.register_namespace(uri)
     # populating our address space
     # server.nodes, contains links to very common nodes like objects and root
-    
     coretigo_url = 'opc.tcp://192.168.1.100:4840/'
-    namespace_id = 3
-    port1_nodeid = 2002
-    port2_nodeid = 1234 # read from ua expert
-    port3_nodeid = 2345 # read from ua expert
-    port4_nodeid = 3456 # read from ua expert
-    sensor1_conversion = 0
     client = Client(url=coretigo_url)
     async with server and client:
-        myobj = await server.nodes.objects.add_object(idx, 'MyObject')
+        myobj = await server.nodes.objects.add_object(idx, 'CIP_DATA')
         port1_PI = await myobj.add_variable(idx, 'Port 1', 0.0)
+        port2_PI = await myobj.add_variable(idx, 'Port 2', 0.0)
+        port3_PI = await myobj.add_variable(idx, 'Port 3', 0.0)
+        #port4_PI = await myobj.add_variable(idx, 'Port 4', 0.0)
+        ports = [port1_PI, port2_PI, port3_PI]
         while True:
-            var = client.get_node("ns=6;i=32824")
-            print("My variable", var, await var.read_value())
-            _logger.info('Set value of %s to %.1f', port1_PI, new_val)
-            
-            await myvar.write_value(new_val)
-
-            uri = "http://examples.freeopcua.github.io"
-            idx = await client.get_namespace_index(uri)
-            _logger.info("index of our namespace is %s", idx)
-            # get a specific node knowing its node id
-            var = client.get_node(ua.NodeId(1002, 2))
-            var = client.get_node("ns=3;i=2002")
-            print(var)
-            await var.read_data_value() # get value of node as a DataValue object
-            #await var.read_value() # get value of node as a python builtin
-            for i in range(100):
-                var = client.get_node("ns=6;i=32824")
-                print("My variable", var, await var.read_value())
-                #print("My variable", var, await var.read_data_value())
-                time.sleep(0.5)
-       
+            for nodeid, converter, port in zip(nodeids, converters, ports):
+                raw_data = client_reader(client, nsidx, nodeid)
+                data = data_converter(raw_data, converter)
+                await port.write_value(data)
+                print(await port.get_value())
+            time.sleep(1)
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
