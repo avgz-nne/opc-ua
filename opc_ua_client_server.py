@@ -7,16 +7,18 @@ from asyncua import ua
 
 _logger = logging.getLogger('asyncua')
 
-def client_reader(client, idx, nodeid):
+async def client_reader(client, idx, nodeid):
+        print(idx, nodeid)
         var = client.get_node(ua.NodeId(nodeid, idx))
-        data = var.read_value()
-        print('byte data is '+ data)
+        data = await var.read_value()
+        print('byte data is')
+        print(data)
         return data
 def data_converter(bytes_raw, dict_converter):
+print	
         data_bytes = bytes_raw[dict_converter["start"],dict_converter["end"]]
         data = int.from_bytes(data_bytes, byteorder='big',signed=True)
         value = data * dict_converter["gradient"]
-        print('byte data is '+ data)
         return value
 
 async def main():
@@ -47,8 +49,8 @@ async def main():
         while True:
             for nodeid, converter, port in zip(nodeids, converters, ports):
                 raw_data = client_reader(client, nsidx, nodeid)
-                data = data_converter(raw_data, converter)
-                await port.write_value(data)
+                #data = data_converter(raw_data, converter)
+                await port.write_value(10)
                 print(await port.get_value())
             time.sleep(1)
 
