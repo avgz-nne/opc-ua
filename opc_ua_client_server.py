@@ -15,7 +15,6 @@ async def client_reader(client, idx, nodeid):
         print(data)
         return data
 def data_converter(bytes_raw, dict_converter):
-print	
         data_bytes = bytes_raw[dict_converter["start"],dict_converter["end"]]
         data = int.from_bytes(data_bytes, byteorder='big',signed=True)
         value = data * dict_converter["gradient"]
@@ -46,6 +45,7 @@ async def main():
         port3_PI = await myobj.add_variable(idx, 'Port 3', 0.0)
         #port4_PI = await myobj.add_variable(idx, 'Port 4', 0.0)
         ports = [port1_PI, port2_PI, port3_PI]
+        
         while True:
             for nodeid, converter, port in zip(nodeids, converters, ports):
                 raw_data = client_reader(client, nsidx, nodeid)
