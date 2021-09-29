@@ -18,10 +18,6 @@ async def main():
     # setup our server
     nsidx = 6
     nodeids = [32824, 98360, 163896] #[pressure pipe, #pressure tan level, temperature pipe]
-    dict_conv1 = {"nbytes":4, "rbits":4, "start":0 , "end":2, "gradient":0.01, "conversion": 1}
-    dict_conv2 = {"nbytes":4, "rbits":0, "start":0 , "end":2, "gradient":0.01, "conversion": 0.0254}
-    dict_conv3 = {"nbytes":2, "rbits":0, "start":0 , "end":2, "gradient":0.1, "conversion": 1}
-    converters = [dict_conv1 , dict_conv2, dict_conv3]
     # setup our server
     server = Server()
     await server.init()
@@ -35,10 +31,13 @@ async def main():
     async with server:
         myobj = await server.nodes.objects.add_object(idx, 'CIP_DATA')
         port1_PI = await myobj.add_variable(idx, 'Port 1', 0.0)
-        port1_PI.set_writable()
         port2_PI = await myobj.add_variable(idx, 'Port 2', 0.0)
         port3_PI = await myobj.add_variable(idx, 'Port 3', 0.0)
         port4_PI = await myobj.add_variable(idx, 'Port 4', 0.0)
+        port1_PI.set_writable()
+        port2_PI.set_writable()
+        port3_PI.set_writable()
+        port4_PI.set_writable()
         await server.export_xml([server.nodes.objects, server.nodes.root, myobj], "basic_opcua_cip.xml")
         while True:
             await asyncio.sleep(1)
