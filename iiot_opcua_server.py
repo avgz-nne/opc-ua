@@ -21,7 +21,8 @@ async def main():
     # setup our server
     server = Server()
     await server.init()
-    server.set_endpoint('opc.tcp://127.0.0.1:4840/nne_unibio/server/')
+    server.set_endpoint('opc.tcp://127.0.0.1:4840/nne_unibio/server/') #### change code
+
      # setup our own namespace, not really necessary but should as spec
     uri = 'http://nne.unibio'
     idx = await server.register_namespace(uri)
@@ -38,6 +39,15 @@ async def main():
         port2_PI.set_writable()
         port3_PI.set_writable()
         port4_PI.set_writable()
+        myobj2 = await server.nodes.objects.add_object(idx, 'POSIX_DATA')
+        port5_PI = await myobj2.add_variable(idx, 'X coordinate', 0.0)
+        port6_PI = await myobj2.add_variable(idx, 'Y coordinate', 0.0)
+        port7_PI = await myobj2.add_variable(idx, 'Z coordinate', 0.0)
+        port8_PI = await myobj2.add_variable(idx, 'Port 4', 0.0)
+        port5_PI.set_writable()
+        port6_PI.set_writable()
+        port7_PI.set_writable()
+        port8_PI.set_writable()
         await server.export_xml([server.nodes.objects, server.nodes.root, myobj], "basic_opcua_cip.xml")
         while True:
             await asyncio.sleep(1)
