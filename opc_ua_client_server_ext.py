@@ -15,8 +15,8 @@ async def client_reader(client, idx, nodeid):
         print(data)
         return data
 def data_converter(bytes_raw, dict_converter):
-        data_bytes = bytes_raw[dict_converter["start"],dict_converter["end"]]
-        data = int.from_bytes(data_bytes, byteorder='big',signed=True)
+        data_bytes = bytes_raw[dict_converter["start"]:dict_converter["end"]]
+        data = int.from_bytes(data_bytes, byteorder='big',signed=True)/2**(dict_converter["rbits"])
         value = data * dict_converter["gradient"]
         return value
 
