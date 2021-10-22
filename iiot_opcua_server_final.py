@@ -29,7 +29,7 @@ async def main():
         myobj2 = await server.nodes.objects.add_object(idx, 'CIP_DATA')
         port5_PI = await myobj2.add_variable(idx, 'X_position', 0.0)
         port6_PI = await myobj2.add_variable(idx, 'Y_position', 0.0)
-        #port7_PI = await myobj2.add_variable(idx, 'CIP_temperature', 0.0)
+        port7_PI = await myobj2.add_variable(idx, 'Zone', 'Container 0')
         await server.export_xml([server.nodes.objects, server.nodes.root, myobj], "basic_opcua_cip.xml")
         while True:
             await asyncio.sleep(1)

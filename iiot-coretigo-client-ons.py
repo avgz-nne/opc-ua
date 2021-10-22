@@ -29,10 +29,10 @@ def data_converter(bytes_raw, dict_converter):
         return value
 
 async def main():
-    url = "opc.tcp://admin@192.168.0.119:4840/nne_unibio/server/"
+    url = "opc.tcp://admin@192.168.0.119:4840/nne_unibio/server/" # this address should be 192.168.10.10
     #_logger.info("Root node is: %r", client.nodes.root)
     #_logger.info("Objects node is: %r", client.nodes.objects)
-    coretigo_url = "opc.tcp://192.168.1.100:4840/"
+    coretigo_url = "opc.tcp://192.168.1.100:4840/" #this address should be 192.168.10.20
   
     # Node objects have methods to read and write node attributes as well as browse or populate address space
     
