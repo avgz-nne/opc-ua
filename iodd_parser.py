@@ -1,8 +1,15 @@
-import re
-import xml.etree.ElementTree as ET
 import logging
+import os
+import re
+import time
+from typing import Union
+import xml.etree.ElementTree as ET
+from zipfile import ZipFile
 
-logging.basicConfig(level=logging.INFO)
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 
 
 def iodd_parser(filepath) -> tuple[list[dict], int]:
@@ -32,7 +39,7 @@ def iodd_parser(filepath) -> tuple[list[dict], int]:
 
     # DeviceFunction element can be used as root for search for records and menus
     device_function = root.find(
-        f"./{iodd_schema_loc}ProfileBody" f"/{iodd_schema_loc}DeviceFunction"
+        f"./{iodd_schema_loc}ProfileBody/{iodd_schema_loc}DeviceFunction"
     )
 
     records = device_function.find(
@@ -89,27 +96,143 @@ def iodd_parser(filepath) -> tuple[list[dict], int]:
     return parsed_dicts, total_bit_length
 
 
-def iodd_to_value_index(parsed_dicts, total_bit_length) -> list[dict]:
+"""def iodd_to_value_index(parsed_dicts, total_bit_length) -> list[dict]:
     for idx, pd in enumerate(parsed_dicts):
         parsed_dicts[idx]["bitLength"] = (
             pd["bitLength"] if pd["bitLength"] is not None else "0"
         )
     parsed_dicts = sorted(parsed_dicts, key=lambda d: d["subindex"])
-    current_value_index: int = 0
     for idx, pd in enumerate(parsed_dicts):
         bit_offset = int(pd["bitOffset"])
+        bit_length = int(pd["bitLength"])
         value_indices: list[int] = []
-        while total_bit_length > bit_offset:
-            value_indices.append(current_value_index)
-            total_bit_length -= 8
-            current_value_index += 1
+        if bit_length % 8 == 0:
+            number_of_indices = int(bit_length / 8)
+        else:
+            number_of_indices = int(bit_length / 8 + 1)
+        start_index = int((total_bit_length - (bit_offset + bit_length)) / 8)
+        for i in range(number_of_indices):
+            value_indices.append(start_index + i)
         parsed_dicts[idx]["valueIndices"] = value_indices
+        logging.info(f"{bit_offset}, {bit_length}, {value_indices}")
+"""
+
+
+def iodd_scraper(
+    sensors: Union[list, str], use_local: bool = True, iodd_folder: str = "./iodd"
+) -> list[str]:
+    """Scrape the IODD finder for the desired sensors IODD file(s).
+
+    If the use_local option is set to False, this function will replace any existing
+    IODD file with a new file.
+    ***Important***: This currently relies on Chrome being installed and the 
+    chromedriver.exe to be in the working directory -> should be noted somehow or
+    checked in the function!
+
+    :param sensors: Name of your sensor(s)
+    :param use_local: Whether to use a local collection of IODD files, defaults to True
+    :param iodd_folder: Location of local IODD file collection, defaults to "./iodd"
+    :return: List of IODD xml files
+    """
+    cwd = os.getcwd()
+    iodd_prefix = ""
+    iodd_suffix = "_IODD.xml"
+    iodds = []
+
+    if type(sensors) == str:
+        sensors = [sensors]
+
+    if not os.path.exists(iodd_folder):
+        logging.debug(f"Folder {iodd_folder} doesn't exist and will be created.")
+        os.mkdir(iodd_folder)
+
+    if not os.path.exists(f"{cwd}\\.tmp"):
+        logging.debug("Creating temporary directory to store downloaded files.")
+        os.mkdir(f"{cwd}\\.tmp")
+
+    # Configuring the browser used with Selenium
+    browser_options = Options()
+    browser_options.headless = True
+    prefs = {"download.default_directory": f"{cwd}\\.tmp"}
+    browser_options.add_experimental_option("excludeSwitches", ["enable-logging"])
+    browser_options.add_experimental_option("prefs", prefs)
+    driver = webdriver.Chrome(
+        service=Service("chromedriver.exe"), options=browser_options
+    )
+    driver.implicitly_wait(10)
+
+    terms_accepted = False
+
+    for sensor in sensors:
+        if os.path.exists(f"./iodd/{iodd_prefix}{sensor}{iodd_suffix}") and use_local:
+            logging.info(
+                f"IODD for {iodd_prefix}{sensor} already exists in IODD collection."
+            )
+            iodds.append(f"{cwd}\\iodd\\{iodd_prefix}{sensor}{iodd_suffix}")
+            continue
         logging.info(
-            f"{pd['name']}, {pd['valueIndices']}, {pd['bitLength']}, {pd['bitOffset']}"
+            f"IODD for {iodd_prefix}{sensor} missing from IODD collection or to be"
+            " replaced. Scraping IODDfinder."
         )
 
-    # return sorted_dicts
+        # Scraping IODDfinder for the sensors IODD
+        driver.get(
+            "https://ioddfinder.io-link.com/productvariants/"
+            f"search?productName=%22{iodd_prefix}{sensor}%22"
+        )
+        download_button = driver.find_element(
+            by=By.XPATH, value="//datatable-body-cell"
+        )
+        logging.debug(f'{iodd_prefix}{sensor}:Found "Download" button')
+        download_button.click()
+        if not terms_accepted:
+            accept_button = driver.find_element(
+                by=By.XPATH, value="//*[./text()='Accept']"
+            )
+            logging.debug('Found "Accept" button')
+            accept_button.click()
+            terms_accepted = True
+        while not os.path.exists(f"{cwd}\\.tmp\\iodd.zip"):
+            logging.debug(f"{iodd_prefix}{sensor}:Waiting for download to finish...")
+            time.sleep(1)
+        logging.debug(f"{iodd_prefix}{sensor}:Download finished.")
+
+        # Handling downloaded zip file
+        with ZipFile(f"{cwd}\\.tmp\\iodd.zip") as archive:
+            file_found = False
+            for info in archive.infolist():
+                if re.search("(IODD1.1.xml)", info.filename):
+                    logging.debug(f"{iodd_prefix}{sensor}:Found IODD file.")
+                    file_found = True
+                    archive.extract(member=info.filename, path=".\\iodd\\")
+                    if os.path.exists(
+                        f"{cwd}\\iodd\\{iodd_prefix}{sensor}{iodd_suffix}"
+                    ):
+                        logging.debug(
+                            f"{iodd_prefix}{sensor}:IODD file already exists and will "
+                            "be replaced."
+                        )
+                        os.remove(f"{cwd}\\iodd\\{iodd_prefix}{sensor}{iodd_suffix}")
+                    try:
+                        os.rename(
+                            f"{cwd}\\iodd\\{info.filename}",
+                            f"{cwd}\\iodd\\{iodd_prefix}{sensor}{iodd_suffix}",
+                        )
+                    except FileExistsError:
+                        pass
+                    iodds.append(f"{cwd}\\iodd\\{iodd_prefix}{sensor}{iodd_suffix}")
+                    break
+            if not file_found:
+                logging.warning(
+                    f"{iodd_prefix}{sensor}:Couldn't find IODD file in zip archive."
+                )
+        os.remove(f"{cwd}\\.tmp\\iodd.zip")
+
+    # Finally remove temporary directory and stop the browser
+    os.rmdir(f"{cwd}\\.tmp")
+    driver.quit()
+    return iodds
 
 
-parsed_dicts, total_bits = iodd_parser("ifm-vvb020.xml")
-print(iodd_to_value_index(parsed_dicts, total_bits))
+myiodd = iodd_scraper(["VVB021", "VVB020"], use_local=False)
+print(myiodd)
