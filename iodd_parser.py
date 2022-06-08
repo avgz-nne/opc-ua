@@ -33,7 +33,7 @@ import xml.etree.ElementTree as ET
 from zipfile import ZipFile
 
 from asyncua import Client
-from asyncua.ua.uaerrors._auto import BadNotConnected
+from asyncua.ua.uaerrors._auto import BadNotConnected, BadNoData
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
@@ -62,6 +62,11 @@ async def find_connected_sensors(
                 logging.debug(f"Sensor {sensor} connected to port {i}")
             except BadNotConnected:
                 logging.debug(f"No sensor connected to port {i}")
+            except BadNoData:
+                logging.debug(
+                    f"Sensor connected to port {i}, but name could not be read. "
+                    "Might be due to non IO-Link sensor connection."
+                )
 
     return connected_sensors
 
