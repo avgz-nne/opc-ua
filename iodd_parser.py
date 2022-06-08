@@ -1,3 +1,29 @@
+"""Locate and handle IODD files for usage with a OPC-UA server.
+
+A typical use case would be to have an IO-Link Master with some sensors connected to it,
+and you want to find out which values of the sensor output are relevant to you. The
+functions would then be executed in this order:
+    1. find_connected_sensors -> Take found sensor names from here
+    2. iodd_scraper -> List of IODD file locations
+    3. iodd_parser -> Information about the sensor outputs
+    4. iodd_to_value_index -> calculates the indices you need to pull the correct data
+       from the OPC-UA server
+
+Functions
+---------
+find_connected_sensors:
+    Looks through the specified OPC-UA server for a number of connections to find any
+    connected sensors
+iodd_parser:
+    Parses IODD xml files into dictionaries with relevant information regarding sensor
+    output
+iodd_scraper:
+    Scrapes a local collection and IODDfinder for the desired IODD files
+iodd_to_value_index:
+    Transforms the bit length information to indices for use with the output from an
+    OPC-UA server
+
+"""
 import logging
 import os
 import re
@@ -6,13 +32,41 @@ from typing import Union
 import xml.etree.ElementTree as ET
 from zipfile import ZipFile
 
+from asyncua import Client
+from asyncua.ua.uaerrors._auto import BadNotConnected
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 
 
-def iodd_parser(filepath) -> tuple[list[dict], int]:
+async def find_connected_sensors(
+    opcua_host: str, opcua_port: int, connections: int = 8
+) -> list[dict]:
+    """Find the sensors that are connected to the specified OPC-UA server.
+
+    :param opcua_host: Host URL of the OPC-UA server
+    :param opcua_port: Port of the OPC-UA server
+    :param connections: Number of possible connections to the IO-Link master
+    :return: List of dictionaries containing port number and sensor names (if available)
+    """
+    async with Client(f"opc.tcp://{opcua_host}:{opcua_port}") as client:
+        connected_sensors: list = []
+        for i in range(1, connections + 1):
+            node = client.get_node(f"ns=1;s=IOLM/Port {i}/Attached Device/Product Name")
+            connected_sensors.append({"port": i, "name": None})
+            try:
+                sensor = await node.read_value()
+                connected_sensors[-1]["name"] = sensor
+                logging.debug(f"Sensor {sensor} connected to port {i}")
+            except BadNotConnected:
+                logging.debug(f"No sensor connected to port {i}")
+
+    return connected_sensors
+
+
+def iodd_parser(filepath: str) -> tuple[list[dict], int]:
     """Parse IODD file into easy to understand dictionaries.
 
     An IODD file is a *.xml file that describes an IO-Link sensor.
@@ -96,7 +150,15 @@ def iodd_parser(filepath) -> tuple[list[dict], int]:
     return parsed_dicts, total_bit_length
 
 
-"""def iodd_to_value_index(parsed_dicts, total_bit_length) -> list[dict]:
+def iodd_to_value_index(parsed_dicts: list[dict], total_bit_length: int) -> list[dict]:
+    """Convert information about bit offset and length to useable indices.
+
+    This function assumes that one "block" of information is 8 bits big.
+
+    :param parsed_dicts: Dictionaries containing informaiton about bit offset and length
+    :param total_bit_length: total amount of bits
+    :return: list of dictionaries as given to the function with value indices added
+    """
     for idx, pd in enumerate(parsed_dicts):
         parsed_dicts[idx]["bitLength"] = (
             pd["bitLength"] if pd["bitLength"] is not None else "0"
@@ -115,29 +177,34 @@ def iodd_parser(filepath) -> tuple[list[dict], int]:
             value_indices.append(start_index + i)
         parsed_dicts[idx]["valueIndices"] = value_indices
         logging.info(f"{bit_offset}, {bit_length}, {value_indices}")
-"""
 
 
 def iodd_scraper(
-    sensors: Union[list, str], use_local: bool = True, iodd_folder: str = "./iodd"
+    sensors: Union[list, str], use_local: bool = True, iodd_folder: str = ".\\iodd",
+    driver_path: str = ".\\chromedriver.exe"
 ) -> list[str]:
     """Scrape the IODD finder for the desired sensors IODD file(s).
 
     If the use_local option is set to False, this function will replace any existing
     IODD file with a new file.
-    ***Important***: This currently relies on Chrome being installed and the 
-    chromedriver.exe to be in the working directory -> should be noted somehow or
-    checked in the function!
+    ***Important***: This currently relies on Chrome being installed -> should be
+    noted somehow or checked in the function!
 
     :param sensors: Name of your sensor(s)
     :param use_local: Whether to use a local collection of IODD files, defaults to True
     :param iodd_folder: Location of local IODD file collection, defaults to "./iodd"
+    :param driver_path: Path to Chrome driver file
     :return: List of IODD xml files
     """
     cwd = os.getcwd()
     iodd_prefix = ""
     iodd_suffix = "_IODD.xml"
     iodds = []
+
+    if not os.path.exists(driver_path):
+        raise FileNotFoundError(
+            "Couldn't locate chromedriver.exe at specified location."
+        )
 
     if type(sensors) == str:
         sensors = [sensors]
@@ -157,7 +224,7 @@ def iodd_scraper(
     browser_options.add_experimental_option("excludeSwitches", ["enable-logging"])
     browser_options.add_experimental_option("prefs", prefs)
     driver = webdriver.Chrome(
-        service=Service("chromedriver.exe"), options=browser_options
+        service=Service(driver_path), options=browser_options
     )
     driver.implicitly_wait(10)
 
@@ -180,6 +247,19 @@ def iodd_scraper(
             "https://ioddfinder.io-link.com/productvariants/"
             f"search?productName=%22{iodd_prefix}{sensor}%22"
         )
+
+        # If the IODD is not available in IODDfinder, a text will be displayed instead
+        # of the table -> Try find that text to see if the sensor was found
+        try:
+            driver.find_element(
+                by=By.XPATH, value="//*[./text()='No data to display']"
+            )
+            logging.warning(f"{sensor}:Couldn't find sensor in IODDfinder.")
+            continue
+        except NoSuchElementException:
+            pass
+
+        # If the IODD was found in IODDfinder, download it and process it
         download_button = driver.find_element(
             by=By.XPATH, value="//datatable-body-cell"
         )
@@ -226,6 +306,8 @@ def iodd_scraper(
                 logging.warning(
                     f"{iodd_prefix}{sensor}:Couldn't find IODD file in zip archive."
                 )
+        # Remove the zip file to avoid multiple files with hard to track names, e.g.
+        # IODD (1).zip etc.
         os.remove(f"{cwd}\\.tmp\\iodd.zip")
 
     # Finally remove temporary directory and stop the browser
@@ -234,5 +316,8 @@ def iodd_scraper(
     return iodds
 
 
-myiodd = iodd_scraper(["VVB021", "VVB020"], use_local=False)
-print(myiodd)
+myiodd = iodd_scraper(["VVB021"], use_local=False)
+for iodd in myiodd:
+    dicts, bits = iodd_parser(iodd)
+    for d in dicts:
+        print(d)
