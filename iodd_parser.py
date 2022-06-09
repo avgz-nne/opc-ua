@@ -47,7 +47,7 @@ async def find_connected_sensors(
 
     :param opcua_host: Host URL of the OPC-UA server
     :param opcua_port: Port of the OPC-UA server
-    :param connections: Number of possible connections to the IO-Link master
+    :param connections: Number of ports of the IO-Link master, defaults to 8
     :return: List of dictionaries containing port number and sensor names (if available)
     """
     async with Client(f"opc.tcp://{opcua_host}:{opcua_port}") as client:
@@ -118,9 +118,7 @@ def iodd_parser(filepath: str) -> tuple[list[dict], int]:
         f"/{iodd_schema_loc}PrimaryLanguage"
     )
 
-    datatypes = device_function.find(
-        f"./{iodd_schema_loc}DatatypeCollection"
-    )
+    datatypes = device_function.find(f"./{iodd_schema_loc}DatatypeCollection")
 
     parsed_dicts: list[dict] = []
     for idx, record in enumerate(records):
@@ -168,22 +166,18 @@ def iodd_parser(filepath: str) -> tuple[list[dict], int]:
     return parsed_dicts, total_bit_length
 
 
-def iodd_to_value_index(parsed_dicts: list[dict], total_bit_length: int) -> list[dict]:
+def iodd_to_value_index(
+    parsed_dicts: list[dict], total_bit_length: int, block_length: int = 8
+) -> list[dict]:
     """Convert information about bit offset and length to useable indices.
 
     This function assumes that one "block" of information is 8 bits big.
 
     :param parsed_dicts: Dictionaries containing informaiton about bit offset and length
     :param total_bit_length: total amount of bits
+    :param block_length: length of one block of bits, defaults to 8
     :return: list of dictionaries as given to the function with value indices added
     """
-    block_length = 8
-    max_index = int(total_bit_length / block_length)
-    for idx, pd in enumerate(parsed_dicts):
-        parsed_dicts[idx]["bitLength"] = (
-            pd["bitLength"] if pd["bitLength"] is not None else "0"
-        )
-
     for idx, pd in enumerate(parsed_dicts):
         bit_offset = int(pd["bitOffset"])
         bit_length = int(pd["bitLength"])
@@ -191,18 +185,22 @@ def iodd_to_value_index(parsed_dicts: list[dict], total_bit_length: int) -> list
             num_indices = int(bit_length / block_length)
         else:
             num_indices = 1
+
         value_indices: list[int] = []
         start_index = int((total_bit_length - (bit_offset + bit_length)) / block_length)
         for index in range(start_index, start_index + num_indices):
             value_indices.append(index)
-        print(value_indices, bit_length, bit_offset)
+        parsed_dicts[idx]["value_indices"] = value_indices
+    return parsed_dicts
 
 
 def iodd_scraper(
-    sensors: list | str, use_local: bool = True, iodd_folder: str = ".\\iodd",
-    driver_path: str = ".\\chromedriver.exe"
+    sensors: list | str,
+    use_local: bool = True,
+    iodd_folder: str = ".\\iodd",
+    driver_path: str = ".\\chromedriver.exe",
 ) -> list[str]:
-    """Scrape the IODD finder for the desired sensors IODD file(s).
+    r"""Scrape the IODD finder for the desired sensors IODD file(s).
 
     If the use_local option is set to False, this function will replace any existing
     IODD file with a new file.
@@ -211,7 +209,7 @@ def iodd_scraper(
 
     :param sensors: Name of your sensor(s)
     :param use_local: Whether to use a local collection of IODD files, defaults to True
-    :param iodd_folder: Location of local IODD file collection, defaults to ".\\iodd"
+    :param iodd_folder: Location of local IODD file collection, defaults to ".\iodd"
     :param driver_path: Path to Chrome driver file
     :return: List of IODD xml files
     """
@@ -248,9 +246,7 @@ def iodd_scraper(
 
     for sensor in sensors:
         if os.path.exists(f"./iodd/{iodd_prefix}{sensor}{iodd_suffix}") and use_local:
-            logging.info(
-                f"IODD for {sensor} already exists in IODD collection."
-            )
+            logging.info(f"IODD for {sensor} already exists in IODD collection.")
             iodds.append(f"{cwd}\\iodd\\{iodd_prefix}{sensor}{iodd_suffix}")
             continue
         logging.info(
@@ -273,9 +269,7 @@ def iodd_scraper(
         # If the IODD is not available in IODDfinder, a text will be displayed instead
         # of the table -> Try find that text to see if the sensor was found
         try:
-            driver.find_element(
-                by=By.XPATH, value="//*[./text()='No data to display']"
-            )
+            driver.find_element(by=By.XPATH, value="//*[./text()='No data to display']")
             logging.warning(f"{sensor}:Couldn't find sensor in IODDfinder.")
             continue
         except NoSuchElementException:
@@ -325,9 +319,7 @@ def iodd_scraper(
                     iodds.append(f"{cwd}\\iodd\\{iodd_prefix}{sensor}{iodd_suffix}")
                     break
             if not file_found:
-                logging.warning(
-                    f"{sensor}:Couldn't find IODD file in zip archive."
-                )
+                logging.warning(f"{sensor}:Couldn't find IODD file in zip archive.")
         # Remove the zip file to avoid multiple files with hard to track names, e.g.
         # IODD (1).zip etc.
         os.remove(f"{cwd}\\.tmp\\iodd.zip")
@@ -338,13 +330,13 @@ def iodd_scraper(
         # If the driver was never started, this will raise an error
         driver.quit()
     except AttributeError:
-        logging.debug(f"Attempted to close driver, but driver was never started.")
+        logging.debug("Attempted to close driver, but driver was never started.")
     return iodds
 
 
-myiodd = iodd_scraper(["CONTRINEX"])
+myiodd = iodd_scraper(["VVB021"])
 for iodd in myiodd:
     dicts, bits = iodd_parser(iodd)
     for d in dicts:
-        #iodd_to_value_index([d], 160)
+        iodd_to_value_index([d], bits)
         print(d)
