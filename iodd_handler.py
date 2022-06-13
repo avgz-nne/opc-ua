@@ -80,26 +80,23 @@ def iodd_parser(filepath: str) -> tuple[list[dict], int]:
     """
     iodd_schema_loc = "{http://www.io-link.com/IODD/2010/10}"
 
-    # Should get this from elsewhere and not hardcode it
-    dict_unit_codes_SI = {
-        "1000": "K degrees",
-        "1001": "C degrees",
-        "1010": "meters",
-        "1023": "m2",
-        "1034": "m3",
-        "1054": "s",
-        "1061": "m/s",
-        "1076": "m/s2",
-    }
-
     tree = ET.parse(filepath)
     root = tree.getroot()
+
+    elements_with_unitcode = root.findall(f".//{iodd_schema_loc}*[@unitCode]")
+    unitcodes_input = []
+    for element in elements_with_unitcode:
+        unitcode = element.get("unitCode")
+        if unitcode not in unitcodes_input:
+            unitcodes_input.append(unitcode)
+    dict_unit_codes_SI = iodd_unitcodes(unitcodes_input=unitcodes_input)
 
     # DeviceFunction element can be used as root for search for records and menus
     device_function = root.find(
         f"./{iodd_schema_loc}ProfileBody/{iodd_schema_loc}DeviceFunction"
     )
 
+    # Searching for the root of records, menus and texts is better for readability
     records = device_function.find(
         f"./{iodd_schema_loc}ProcessDataCollection"
         f"/{iodd_schema_loc}ProcessData"
@@ -191,6 +188,8 @@ def iodd_to_value_index(
         for index in range(start_index, start_index + num_indices):
             value_indices.append(index)
         parsed_dicts[idx]["value_indices"] = value_indices
+        print([d["value_indices"] for d in parsed_dicts])
+
     return parsed_dicts
 
 
@@ -332,6 +331,36 @@ def iodd_scraper(
     except AttributeError:
         logging.debug("Attempted to close driver, but driver was never started.")
     return iodds
+
+
+def iodd_unitcodes(
+    unitcodes_input: list, loc: str = ".\\iodd\\IODD-StandardUnitDefinitions1.1.xml"
+) -> list[dict]:
+    r"""Associate unitcodes with their respective abbreviations.
+
+    :param unitcodes_input: list of unitcodes used in a given IODD
+    :param loc: location of the IODD-StandardUnitDefinitions*.xml file,
+                defaults to ".\iodd\IODD-StandardUnitDefinitions1.1.xml"
+    :return: list of dicts with used unitcodes
+    """
+    tree = ET.parse(loc)
+    root = tree.getroot()
+    iodd_schema_loc = "{http://www.io-link.com/IODD/2010/10}"
+
+    iodd_units_version = root.find(f"./{iodd_schema_loc}DocumentInfo")
+    logging.info(
+        "IODD-StandardUnitDefinitions version"
+        f"{iodd_units_version.get(iodd_units_version)}"
+    )
+
+    unitcodes_output = []
+    for unitcode in unitcodes_input:
+        unit = root.find(
+            f"./{iodd_schema_loc}UnitCollection"
+            f"/{iodd_schema_loc}Unit[@code='{unitcode}']"
+        )
+        unitcodes_output.append({unit.get("code"): unit.get("abbr")})
+    return unitcodes_output
 
 
 myiodd = iodd_scraper(["VVB021"])
