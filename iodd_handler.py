@@ -24,6 +24,7 @@ iodd_to_value_index:
     OPC-UA server
 
 """
+import json
 import logging
 import os
 import re
@@ -39,6 +40,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 
+
+logging.basicConfig(level=logging.INFO)
 
 async def find_connected_sensors(
     opcua_host: str, opcua_port: int, connections: int = 8
@@ -90,7 +93,6 @@ def iodd_parser(filepath: str) -> tuple[list[dict], int]:
         if unitcode not in unitcodes_input:
             unitcodes_input.append(unitcode)
     dict_unit_codes_SI = iodd_unitcodes(unitcodes_input=unitcodes_input)
-
     # DeviceFunction element can be used as root for search for records and menus
     device_function = root.find(
         f"./{iodd_schema_loc}ProfileBody/{iodd_schema_loc}DeviceFunction"
@@ -145,7 +147,7 @@ def iodd_parser(filepath: str) -> tuple[list[dict], int]:
 
     for menu in menus:
         for unit in dict_unit_codes_SI.keys():
-            if re.search(f"^M_MR_SR_Observation_.*{unit}$", menu.get("id")):
+            if re.search(f"^M_MR_SR_Observation[_{unit}]*$", menu.get("id")):
                 record = menu.find(f"./{iodd_schema_loc}RecordItemRef")
                 subindex = record.get("subindex")
                 for parsed_dict in parsed_dicts:
@@ -188,7 +190,6 @@ def iodd_to_value_index(
         for index in range(start_index, start_index + num_indices):
             value_indices.append(index)
         parsed_dicts[idx]["value_indices"] = value_indices
-        print([d["value_indices"] for d in parsed_dicts])
 
     return parsed_dicts
 
@@ -213,9 +214,7 @@ def iodd_scraper(
     :return: List of IODD xml files
     """
     cwd = os.getcwd()
-    iodd_prefix = ""
-    iodd_suffix = "_IODD.xml"
-    iodds = []
+    iodds = {}
 
     if not os.path.exists(driver_path):
         raise FileNotFoundError(
@@ -228,6 +227,11 @@ def iodd_scraper(
     if not os.path.exists(iodd_folder):
         logging.debug(f"Folder {iodd_folder} doesn't exist and will be created.")
         os.mkdir(iodd_folder)
+
+    if not os.path.exists(f"{iodd_folder}\\iodd_names.json"):
+        logging.debug(f"IODD name collection doesn't exist and will be created.")
+        with open(f"{iodd_folder}\\iodd_names.json", "w") as f:
+            json.dump([], f)
 
     if not os.path.exists(f"{cwd}\\.tmp"):
         logging.debug("Creating temporary directory to store downloaded files.")
@@ -243,10 +247,21 @@ def iodd_scraper(
 
     terms_accepted = False
 
+    with open(f"{iodd_folder}\\iodd_names.json", "r") as f:
+        known_iodds = json.loads(f.read())
+
     for sensor in sensors:
-        if os.path.exists(f"./iodd/{iodd_prefix}{sensor}{iodd_suffix}") and use_local:
-            logging.info(f"IODD for {sensor} already exists in IODD collection.")
-            iodds.append(f"{cwd}\\iodd\\{iodd_prefix}{sensor}{iodd_suffix}")
+        sensor_known = False
+        for known_iodd in known_iodds:
+            try:
+                if os.path.exists(known_iodd[sensor]) and use_local:
+                    logging.info(f"IODD for {sensor} already exists in IODD collection.")
+                    iodds[sensor] = known_iodd[sensor]
+                    sensor_known = True
+                    break
+            except KeyError:
+                pass
+        if sensor_known:
             continue
         logging.info(
             f"IODD for {sensor} missing from IODD collection or to be"
@@ -262,7 +277,7 @@ def iodd_scraper(
         # Scraping IODDfinder for the sensors IODD
         driver.get(
             "https://ioddfinder.io-link.com/productvariants/"
-            f"search?productName=%22{iodd_prefix}{sensor}%22"
+            f"search?productName=%22{sensor}%22"
         )
 
         # If the IODD is not available in IODDfinder, a text will be displayed instead
@@ -299,23 +314,15 @@ def iodd_scraper(
                 if re.search("(IODD1.1.xml)", info.filename):
                     logging.debug(f"{sensor}:Found IODD file.")
                     file_found = True
-                    archive.extract(member=info.filename, path=".\\iodd\\")
-                    if os.path.exists(
-                        f"{cwd}\\iodd\\{iodd_prefix}{sensor}{iodd_suffix}"
-                    ):
+                    if os.path.exists(f"{cwd}\\iodd\\{info.filename}"):
                         logging.debug(
                             f"{sensor}:IODD file already exists and will "
                             "be replaced."
                         )
-                        os.remove(f"{cwd}\\iodd\\{iodd_prefix}{sensor}{iodd_suffix}")
-                    try:
-                        os.rename(
-                            f"{cwd}\\iodd\\{info.filename}",
-                            f"{cwd}\\iodd\\{iodd_prefix}{sensor}{iodd_suffix}",
-                        )
-                    except FileExistsError:
-                        pass
-                    iodds.append(f"{cwd}\\iodd\\{iodd_prefix}{sensor}{iodd_suffix}")
+                        os.remove(f"{cwd}\\iodd\\{info.filename}")
+                    archive.extract(member=info.filename, path=".\\iodd\\")
+                    iodds[sensor] = f"{cwd}\\iodd\\{info.filename}"
+                    known_iodds.append({sensor: f"{cwd}\\iodd\\{info.filename}"})
                     break
             if not file_found:
                 logging.warning(f"{sensor}:Couldn't find IODD file in zip archive.")
@@ -323,13 +330,15 @@ def iodd_scraper(
         # IODD (1).zip etc.
         os.remove(f"{cwd}\\.tmp\\iodd.zip")
 
-    # Finally remove temporary directory and stop the driver
+    # Finally remove temporary directory stop the driver, and update the known iodds
     os.rmdir(f"{cwd}\\.tmp")
     try:
         # If the driver was never started, this will raise an error
         driver.quit()
     except AttributeError:
         logging.debug("Attempted to close driver, but driver was never started.")
+    with open(f"{iodd_folder}\\iodd_names.json", "w") as f:
+        json.dump(known_iodds, f, indent=4)
     return iodds
 
 
@@ -349,23 +358,26 @@ def iodd_unitcodes(
 
     iodd_units_version = root.find(f"./{iodd_schema_loc}DocumentInfo")
     logging.info(
-        "IODD-StandardUnitDefinitions version"
-        f"{iodd_units_version.get(iodd_units_version)}"
+        "IODD-StandardUnitDefinitions version "
+        f"{iodd_units_version.get('version')}"
     )
 
-    unitcodes_output = []
+    unitcodes_output = {}
     for unitcode in unitcodes_input:
         unit = root.find(
             f"./{iodd_schema_loc}UnitCollection"
             f"/{iodd_schema_loc}Unit[@code='{unitcode}']"
         )
-        unitcodes_output.append({unit.get("code"): unit.get("abbr")})
+        unitcodes_output[unit.get("code")] = unit.get("abbr")
+
+    # Some variables might have unitcode "None", therefore we will manually
     return unitcodes_output
 
 
-myiodd = iodd_scraper(["VVB021"])
-for iodd in myiodd:
-    dicts, bits = iodd_parser(iodd)
+myiodd = iodd_scraper(["E2EQ-X3B4-IL2"])
+print(myiodd)
+for name, iodd_loc in myiodd.items():
+    logging.info(f"Parsing IODD for {name} @ {iodd_loc}")
+    dicts, bits = iodd_parser(iodd_loc)
     for d in dicts:
-        iodd_to_value_index([d], bits)
-        print(d)
+        print(iodd_to_value_index([d], bits))
