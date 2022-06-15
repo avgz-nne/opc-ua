@@ -39,6 +39,9 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+
+from iodd import IODD
 
 
 logging.basicConfig(level=logging.INFO)
@@ -198,7 +201,6 @@ def iodd_scraper(
     sensors: list | str,
     use_local: bool = True,
     iodd_folder: str = ".\\iodd",
-    driver_path: str = ".\\chromedriver.exe",
 ) -> list[str]:
     r"""Scrape the IODD finder for the desired sensors IODD file(s).
 
@@ -210,16 +212,10 @@ def iodd_scraper(
     :param sensors: Name of your sensor(s)
     :param use_local: Whether to use a local collection of IODD files, defaults to True
     :param iodd_folder: Location of local IODD file collection, defaults to ".\iodd"
-    :param driver_path: Path to Chrome driver file
     :return: List of IODD xml files
     """
     cwd = os.getcwd()
     iodds = {}
-
-    if not os.path.exists(driver_path):
-        raise FileNotFoundError(
-            "Couldn't locate chromedriver.exe at specified location."
-        )
 
     if type(sensors) == str:
         sensors = [sensors]
@@ -270,7 +266,7 @@ def iodd_scraper(
         # Only need to start the driver if it is actually necessary
         if driver is None:
             driver = webdriver.Chrome(
-                service=Service(driver_path), options=browser_options
+                service=Service(executable_path=ChromeDriverManager().install()), options=browser_options
             )
             driver.implicitly_wait(10)
 
@@ -370,11 +366,63 @@ def iodd_unitcodes(
         )
         unitcodes_output[unit.get("code")] = unit.get("abbr")
 
-    # Some variables might have unitcode "None", therefore we will manually
+    # Some variables might have unitcode "None", therefore we will manually add an entry
+    unitcodes_output[None] = "N/A"
+    
     return unitcodes_output
 
 
-myiodd = iodd_scraper(["E2EQ-X3B4-IL2"])
+def verify_iodd_collection(loc: str = ".\\iodd"):
+    iodd_files = os.listdir(path=loc)
+    iodd_schema_loc = "{http://www.io-link.com/IODD/2010/10}"
+    entries_to_be_removed = []
+    if "iodd_names.json" in iodd_files:
+        with open(file=f"{loc}\\iodd_names.json", mode="r") as f:
+            known_iodds = json.loads(f.read())
+            names = [list(d.keys())[0] for d in known_iodds]
+            paths = [list(d.values())[0] for d in known_iodds]
+            files = []
+            for path in paths:
+                file = path.split("\\")[-1]
+                if not os.path.exists(path):
+                    logging.info(f"{names[paths.index(path)]}: {file} doesn't exist. Entry will be removed from collection.")
+                    entries_to_be_removed.append(names[paths.index(path)])
+                    continue
+                logging.info(f"{names[paths.index(path)]}: {file} exists.")
+                files.append(file)
+    else:
+        raise FileNotFoundError("iodd_names.json file couldn't be found.")
+    
+    # Verify that the entries in iodd_names.json actually match the IODD files
+    for file in files:
+        name = names[files.index(file)]
+        tree = ET.parse(source=f"{loc}\\{file}")
+        root = tree.getroot()
+        device_variants = root.findall(
+            f"./{iodd_schema_loc}ProfileBody"
+            f"/{iodd_schema_loc}DeviceIdentity"
+            f"/{iodd_schema_loc}DeviceVariantCollection"
+            f"/{iodd_schema_loc}DeviceVariant"
+        )
+        match_in_file = False
+        for device_variant in device_variants:
+            if name in device_variant.get("productId"):
+                logging.info(f"IODD {file} contains {name} or a variant of {name}.")
+                match_in_file = True
+                break
+        if not match_in_file:
+            logging.info(f"No variant {name} found in {file}. Entry will be removed from collection.")
+            entries_to_be_removed.append(name)
+    for entry in entries_to_be_removed:
+        idx = [i for i, d in enumerate(known_iodds) if list(d.keys())[0] == entry][0]
+        known_iodds.pop(idx)
+    with open(file=f"{loc}\\iodd_names.json", mode="w") as f:
+        json.dump(known_iodds, f, indent=4)
+
+
+#verify_iodd_collection()
+
+myiodd = iodd_scraper(["VVB021"])
 print(myiodd)
 for name, iodd_loc in myiodd.items():
     logging.info(f"Parsing IODD for {name} @ {iodd_loc}")
