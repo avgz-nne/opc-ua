@@ -41,10 +41,11 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-from iodd import IODD
+from iodd import IODD, InformationPoint
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
+
 
 async def find_connected_sensors(
     opcua_host: str, opcua_port: int, connections: int = 8
@@ -76,18 +77,20 @@ async def find_connected_sensors(
     return connected_sensors
 
 
-def iodd_parser(filepath: str) -> tuple[list[dict], int]:
-    """Parse IODD file into easy to understand dictionaries.
+def iodd_parser(iodd: IODD) -> IODD:
+    """Parse IODD file into easy to understand IODD dataclass.
 
     An IODD file is a *.xml file that describes an IO-Link sensor.
 
-    :param filepath: Path to the *.xml IODD file you want to parse.
-    :return: List of dictionaries describing each output the sensor has.
+    :param iodd: IODD object containing the location of the IODD file
+    :return: modified input IODD object with relevant information points
     """
     iodd_schema_loc = "{http://www.io-link.com/IODD/2010/10}"
 
-    tree = ET.parse(filepath)
+    tree = ET.parse(iodd.iodd_file_location)
     root = tree.getroot()
+
+    logging.debug(f"IODD file for {iodd.sensor_name} ready for parsing.")
 
     elements_with_unitcode = root.findall(f".//{iodd_schema_loc}*[@unitCode]")
     unitcodes_input = []
@@ -122,86 +125,83 @@ def iodd_parser(filepath: str) -> tuple[list[dict], int]:
 
     datatypes = device_function.find(f"./{iodd_schema_loc}DatatypeCollection")
 
-    parsed_dicts: list[dict] = []
     for idx, record in enumerate(records):
-        parsed_dicts.append({})
-        name = record.find(f"./{iodd_schema_loc}Name")
-        nameid = name.get("textId")
+        name_node = record.find(f"./{iodd_schema_loc}Name")
+        nameid = name_node.get("textId")
         text = texts.find(f"./{iodd_schema_loc}Text[@id='{nameid}']")
-        parsed_dicts[idx]["name"] = text.get("value")
-        parsed_dicts[idx]["bitOffset"] = record.get("bitOffset")
-        parsed_dicts[idx]["subindex"] = record.get("subindex")
+        name = text.get("value")
+        bit_offset = int(record.get("bitOffset"))
+        subindex = int(record.get("subindex"))
+
         # Some records might have a custom datatype, this accounts for that
         data = record.find(f"./{iodd_schema_loc}SimpleDatatype")
         if data is None:
             datatype_ref = record.find(f"./{iodd_schema_loc}DatatypeRef")
             datatype_id = datatype_ref.get("datatypeId")
             data = datatypes.find(f".{iodd_schema_loc}Datatype[@id='{datatype_id}']")
+
         # boolean like datatypes have no bit length in their attributes, but are
         # represented by a 0 or 1 -> bit length is 1
         bit_length = data.get("bitLength")
         if bit_length is None:
-            bit_length = "1"
-        parsed_dicts[idx]["bitLength"] = bit_length
+            bit_length = 1
+        else:
+            bit_length = int(bit_length)
+
+        information_point = InformationPoint(
+            name=name, bit_offset=bit_offset, bit_length=bit_length, subindex=subindex
+        )
+
         valueRange = data.find(f"./{iodd_schema_loc}ValueRange")
         if valueRange is not None:
-            parsed_dicts[idx]["low_val"] = valueRange.get("lowerValue")
-            parsed_dicts[idx]["up_val"] = valueRange.get("upperValue")
+            low_val = int(valueRange.get("lowerValue"))
+            up_val = int(valueRange.get("upperValue"))
+            information_point.low_val = low_val
+            information_point.up_val = up_val
+
+        iodd.information_points.append(information_point)
 
     for menu in menus:
-        for unit in dict_unit_codes_SI.keys():
-            if re.search(f"^M_MR_SR_Observation[_{unit}]*$", menu.get("id")):
-                record = menu.find(f"./{iodd_schema_loc}RecordItemRef")
-                subindex = record.get("subindex")
-                for parsed_dict in parsed_dicts:
-                    if parsed_dict["subindex"] == subindex:
-                        parsed_dict["gradient"] = record.get("gradient")
-                        parsed_dict["offset"] = record.get("offset")
-                        parsed_dict["displayFormat"] = record.get("displayFormat")
-                        parsed_dict["unitCode"] = record.get("unitCode")
-                        parsed_dict["units"] = dict_unit_codes_SI[
-                            record.get("unitCode")
-                        ]
+        if any(
+            [
+                re.search(f"^M_MR_SR_Observation(_[^_]*)?(_{unit})?$", menu.get("id"))
+                for unit in dict_unit_codes_SI.keys()
+            ]
+        ):
+            record_item_ref = menu.find(f"./{iodd_schema_loc}RecordItemRef")
+            subindex = int(record_item_ref.get("subindex"))
+            for idx, information_point in enumerate(iodd.information_points):
+                if information_point.subindex == subindex:
+                    gradient = record_item_ref.get("gradient")
+                    iodd.information_points[idx].gradient = (
+                        float(gradient) if gradient is not None else gradient
+                    )
+                    offset = record_item_ref.get("offset")
+                    iodd.information_points[idx].offset = (
+                        float(offset) if offset is not None else offset
+                    )
+                    iodd.information_points[idx].display_format = record_item_ref.get(
+                        "displayFormat"
+                    )
+                    unitcode = record_item_ref.get("unitCode")
+                    iodd.information_points[idx].unit_code = (
+                        int(unitcode) if unitcode is not None else unitcode
+                    )
+                    iodd.information_points[idx].units = dict_unit_codes_SI[
+                        int(unitcode) if unitcode is not None else unitcode
+                    ]
 
     total_bit_length = int(records.get("bitLength"))
+    iodd.total_bit_length = total_bit_length
 
-    return parsed_dicts, total_bit_length
-
-
-def iodd_to_value_index(
-    parsed_dicts: list[dict], total_bit_length: int, block_length: int = 8
-) -> list[dict]:
-    """Convert information about bit offset and length to useable indices.
-
-    This function assumes that one "block" of information is 8 bits big.
-
-    :param parsed_dicts: Dictionaries containing informaiton about bit offset and length
-    :param total_bit_length: total amount of bits
-    :param block_length: length of one block of bits, defaults to 8
-    :return: list of dictionaries as given to the function with value indices added
-    """
-    for idx, pd in enumerate(parsed_dicts):
-        bit_offset = int(pd["bitOffset"])
-        bit_length = int(pd["bitLength"])
-        if (bit_length % block_length == 0) and (bit_length >= block_length):
-            num_indices = int(bit_length / block_length)
-        else:
-            num_indices = 1
-
-        value_indices: list[int] = []
-        start_index = int((total_bit_length - (bit_offset + bit_length)) / block_length)
-        for index in range(start_index, start_index + num_indices):
-            value_indices.append(index)
-        parsed_dicts[idx]["value_indices"] = value_indices
-
-    return parsed_dicts
+    return iodd
 
 
 def iodd_scraper(
     sensors: list | str,
     use_local: bool = True,
     iodd_folder: str = ".\\iodd",
-) -> list[str]:
+) -> list[IODD]:
     r"""Scrape the IODD finder for the desired sensors IODD file(s).
 
     If the use_local option is set to False, this function will replace any existing
@@ -214,8 +214,9 @@ def iodd_scraper(
     :param iodd_folder: Location of local IODD file collection, defaults to ".\iodd"
     :return: List of IODD xml files
     """
+    # TODO: Make sure the file we downloaded actually has the sensor in its variants
     cwd = os.getcwd()
-    iodds = {}
+    iodds = []
 
     if type(sensors) == str:
         sensors = [sensors]
@@ -223,11 +224,6 @@ def iodd_scraper(
     if not os.path.exists(iodd_folder):
         logging.debug(f"Folder {iodd_folder} doesn't exist and will be created.")
         os.mkdir(iodd_folder)
-
-    if not os.path.exists(f"{iodd_folder}\\iodd_names.json"):
-        logging.debug(f"IODD name collection doesn't exist and will be created.")
-        with open(f"{iodd_folder}\\iodd_names.json", "w") as f:
-            json.dump([], f)
 
     if not os.path.exists(f"{cwd}\\.tmp"):
         logging.debug("Creating temporary directory to store downloaded files.")
@@ -243,20 +239,22 @@ def iodd_scraper(
 
     terms_accepted = False
 
-    with open(f"{iodd_folder}\\iodd_names.json", "r") as f:
+    with open(f"{iodd_folder}\\iodd_collection_index.json", "r") as f:
         known_iodds = json.loads(f.read())
 
     for sensor in sensors:
         sensor_known = False
         for known_iodd in known_iodds:
-            try:
-                if os.path.exists(known_iodd[sensor]) and use_local:
-                    logging.info(f"IODD for {sensor} already exists in IODD collection.")
-                    iodds[sensor] = known_iodd[sensor]
+            if sensor in known_iodd["family"]:
+                if os.path.exists(known_iodd["file"]) and use_local:
+                    logging.info(
+                        f"IODD for {sensor} already exists in IODD collection."
+                    )
+                    iodds.append(
+                        IODD(sensor_name=sensor, iodd_file_location=known_iodd["file"])
+                    )
                     sensor_known = True
                     break
-            except KeyError:
-                pass
         if sensor_known:
             continue
         logging.info(
@@ -266,7 +264,8 @@ def iodd_scraper(
         # Only need to start the driver if it is actually necessary
         if driver is None:
             driver = webdriver.Chrome(
-                service=Service(executable_path=ChromeDriverManager().install()), options=browser_options
+                service=Service(executable_path=ChromeDriverManager().install()),
+                options=browser_options,
             )
             driver.implicitly_wait(10)
 
@@ -317,8 +316,12 @@ def iodd_scraper(
                         )
                         os.remove(f"{cwd}\\iodd\\{info.filename}")
                     archive.extract(member=info.filename, path=".\\iodd\\")
-                    iodds[sensor] = f"{cwd}\\iodd\\{info.filename}"
-                    known_iodds.append({sensor: f"{cwd}\\iodd\\{info.filename}"})
+                    iodds.append(
+                        IODD(
+                            sensor_name=sensor,
+                            iodd_file_name=f"{cwd}\\iodd\\{info.filename}",
+                        )
+                    )
                     break
             if not file_found:
                 logging.warning(f"{sensor}:Couldn't find IODD file in zip archive.")
@@ -333,9 +336,34 @@ def iodd_scraper(
         driver.quit()
     except AttributeError:
         logging.debug("Attempted to close driver, but driver was never started.")
-    with open(f"{iodd_folder}\\iodd_names.json", "w") as f:
-        json.dump(known_iodds, f, indent=4)
+    update_iodd_collection()
     return iodds
+
+
+def iodd_to_value_index(parsed_iodd: IODD, block_length: int = 8) -> IODD:
+    """Convert information about bit offset and length to useable indices.
+
+    :param parsed_iodd: parsed IODD object
+    :param block_length: length of one block of bits, defaults to 8
+    :return: IODD object with value indices added
+    """
+    for idx, ip in enumerate(parsed_iodd.information_points):
+        bit_offset = ip.bit_offset
+        bit_length = ip.bit_length
+        if (bit_length % block_length == 0) and (bit_length >= block_length):
+            num_indices = int(bit_length / block_length)
+        else:
+            num_indices = 1
+
+        value_indices: list[int] = []
+        start_index = int(
+            (parsed_iodd.total_bit_length - (bit_offset + bit_length)) / block_length
+        )
+        for index in range(start_index, start_index + num_indices):
+            value_indices.append(index)
+        parsed_iodd.information_points[idx].value_indices = value_indices
+
+    return parsed_iodd
 
 
 def iodd_unitcodes(
@@ -353,9 +381,8 @@ def iodd_unitcodes(
     iodd_schema_loc = "{http://www.io-link.com/IODD/2010/10}"
 
     iodd_units_version = root.find(f"./{iodd_schema_loc}DocumentInfo")
-    logging.info(
-        "IODD-StandardUnitDefinitions version "
-        f"{iodd_units_version.get('version')}"
+    logging.debug(
+        "IODD-StandardUnitDefinitions version " f"{iodd_units_version.get('version')}"
     )
 
     unitcodes_output = {}
@@ -364,39 +391,34 @@ def iodd_unitcodes(
             f"./{iodd_schema_loc}UnitCollection"
             f"/{iodd_schema_loc}Unit[@code='{unitcode}']"
         )
-        unitcodes_output[unit.get("code")] = unit.get("abbr")
+        unitcodes_output[int(unit.get("code"))] = unit.get("abbr")
 
     # Some variables might have unitcode "None", therefore we will manually add an entry
     unitcodes_output[None] = "N/A"
-    
+
     return unitcodes_output
 
 
-def verify_iodd_collection(loc: str = ".\\iodd"):
-    iodd_files = os.listdir(path=loc)
+def update_iodd_collection(iodd_collection_loc: str = "iodd"):
+    """Update the IODD collection file.
+
+    :param iodd_collection_loc: _description_, defaults to "iodd"
+    """
     iodd_schema_loc = "{http://www.io-link.com/IODD/2010/10}"
-    entries_to_be_removed = []
-    if "iodd_names.json" in iodd_files:
-        with open(file=f"{loc}\\iodd_names.json", mode="r") as f:
-            known_iodds = json.loads(f.read())
-            names = [list(d.keys())[0] for d in known_iodds]
-            paths = [list(d.values())[0] for d in known_iodds]
-            files = []
-            for path in paths:
-                file = path.split("\\")[-1]
-                if not os.path.exists(path):
-                    logging.info(f"{names[paths.index(path)]}: {file} doesn't exist. Entry will be removed from collection.")
-                    entries_to_be_removed.append(names[paths.index(path)])
-                    continue
-                logging.info(f"{names[paths.index(path)]}: {file} exists.")
-                files.append(file)
-    else:
-        raise FileNotFoundError("iodd_names.json file couldn't be found.")
-    
-    # Verify that the entries in iodd_names.json actually match the IODD files
-    for file in files:
-        name = names[files.index(file)]
-        tree = ET.parse(source=f"{loc}\\{file}")
+
+    iodd_collection = [
+        (os.path.join(os.getcwd(), iodd_collection_loc, file), file)
+        for file in os.listdir(path=iodd_collection_loc)
+    ]
+
+    updated_iodd_collection: list[dict] = []
+    for file in iodd_collection:
+        if file[1] in [
+            "iodd_collection_index.json",
+            "IODD-StandardUnitDefinitions1.1.xml",
+        ]:
+            continue
+        tree = ET.parse(source=file[0])
         root = tree.getroot()
         device_variants = root.findall(
             f"./{iodd_schema_loc}ProfileBody"
@@ -404,28 +426,21 @@ def verify_iodd_collection(loc: str = ".\\iodd"):
             f"/{iodd_schema_loc}DeviceVariantCollection"
             f"/{iodd_schema_loc}DeviceVariant"
         )
-        match_in_file = False
-        for device_variant in device_variants:
-            if name in device_variant.get("productId"):
-                logging.info(f"IODD {file} contains {name} or a variant of {name}.")
-                match_in_file = True
-                break
-        if not match_in_file:
-            logging.info(f"No variant {name} found in {file}. Entry will be removed from collection.")
-            entries_to_be_removed.append(name)
-    for entry in entries_to_be_removed:
-        idx = [i for i, d in enumerate(known_iodds) if list(d.keys())[0] == entry][0]
-        known_iodds.pop(idx)
-    with open(file=f"{loc}\\iodd_names.json", mode="w") as f:
-        json.dump(known_iodds, f, indent=4)
+        variants = [dv.get("productId") for dv in device_variants]
+        updated_iodd_collection.append(
+            {"family": variants, "file": f"{os.getcwd()}\\iodd\\{file[1]}"}
+        )
+    with open(
+        os.path.join(iodd_collection_loc, "iodd_collection_index.json"), "w"
+    ) as f:
+        json.dump(updated_iodd_collection, f, indent=4)
 
 
-#verify_iodd_collection()
+# For testing, should be deleted at some point or moved to module description
+from pprint import pprint
 
-myiodd = iodd_scraper(["VVB021"])
-print(myiodd)
-for name, iodd_loc in myiodd.items():
-    logging.info(f"Parsing IODD for {name} @ {iodd_loc}")
-    dicts, bits = iodd_parser(iodd_loc)
-    for d in dicts:
-        print(iodd_to_value_index([d], bits))
+iodds = iodd_scraper(["OGH283"])
+iodds = [iodd_parser(iodd) for iodd in iodds]
+pprint(iodds[0].information_points[0])
+iodds = [iodd_to_value_index(iodd) for iodd in iodds]
+pprint(iodds[0].information_points[0])

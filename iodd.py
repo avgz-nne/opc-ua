@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -11,16 +11,17 @@ class InformationPoint:
     """
 
     name: str
-    bitOffset: int
+    bit_offset: int
+    bit_length: int
     subindex: int
-    bitLength: int
-    low_val: Optional[int]
-    up_val: Optional[int]
-    gradient: Optional[float]
-    display_format: Optional[str]
-    unit_code: Optional[int]
-    units: Optional[str]
-    value_indices: list[int]
+    low_val: Optional[int] = None
+    up_val: Optional[int] = None
+    gradient: Optional[float] = None
+    offset: Optional[float] = None
+    display_format: Optional[str] = None
+    unit_code: Optional[int] = None
+    units: Optional[str] = None
+    value_indices: list[int] = None
 
 
 @dataclass
@@ -28,5 +29,6 @@ class IODD:
     """Dataclass to store information about IODD files and their contents."""
 
     sensor_name: str
-    iodd_file_name: str
-    information_point: InformationPoint
+    iodd_file_location: str
+    information_points: list[InformationPoint] = field(default_factory=list)
+    total_bit_length: int = None
