@@ -1,0 +1,17 @@
+[
+    {
+        "family": [
+            "O6H706",
+            "O6H707",
+            "O6H708"
+        ],
+        "file": "C:\\Users\\SPQL\\Documents\\IoT_knowledge_base\\opc-ua\\iodd\\collection\\ifm-000402-20180319-IODD1.1.xml"
+    },
+    {
+        "family": [
+            "OGH283",
+            "OGH383"
+        ],
+        "file": "C:\\Users\\SPQL\\Documents\\IoT_knowledge_base\\opc-ua\\iodd\\collection\\ifm-000473-20190312-IODD1.1.xml"
+    }
+]
