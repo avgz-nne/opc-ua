@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block head %}
+    {{ super() }}
+{% endblock %}
+{% block nav %}
+    {{ super() }}
+    <style>
+        #nav-settings {
+            color: #E22C4A;
+        }
+    </style>
+{% endblock %}
+{% block content %}
+    <div class="content">
+        <button class="collapsible">
+            <b>OPC-UA Settings</b>
+        </button>
+        <div class="coll-content">
+            <div class="setting">
+                <form>
+                    <label for="opcua-address">OPC-UA Host Address</label>
+                    <input type="text" id="opcua-address" name="opcua-address" placeholder="192.168.1.250">
+                    <input type="submit" value="Update" id="submit-opcua-address">
+                </form>
+            </div>
+            <div class="setting">
+                <form>
+                    <label for="opcua-port">OPC-UA Host Port</label>
+                    <input type="text" id="opcua-port" name="opcua-port" placeholder="4840">
+                    <input type="submit" value="Update" id="submit-opcua-port">
+                </form>
+            </div>
+        </div>
+        <button class="collapsible">
+            <b>SQL Server Settings</b>
+        </button>
+        <div class="coll-content">
+            <div class="setting">
+                <form>
+                    <label for="sql-address">SQL Server Address</label>
+                    <input type="text" id="sql-address" name="sql-address" placeholder="???">
+                    <input type="submit" value="Update" id="submit-sql-address">
+                </form>
+            </div>
+            <div class="setting">
+                <form>
+                    <label for="sql-port">SQL Server Port</label>
+                    <input type="text" id="sql-port" name="sql-port" placeholder="???">
+                    <input type="submit" value="Update" id="submit-sql-port">
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+{% block scripts %}
+    {{ super() }}
+{% endblock %}

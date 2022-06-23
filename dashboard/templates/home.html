@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block head %}
+    {{ super() }}
+{% endblock %}
+{% block nav %}
+    {{ super() }}
+    <style>
+        #nav-home {
+            color: #E22C4A;
+        }
+    </style>
+{% endblock %}
+{% block content %}
+    <div class="content">
+        <div class="text-content">
+            <h3 class="coll-content-header">NNE IoT Box</h3>
+            <div style="float: right; background-color: #25303B; width: 400px; height: 170px; border-radius: 20px; margin-left: 10px;">
+                <div style="width: 100%; height: fit-content; padding-top: 5px; color:white; text-align: center; font-weight: bold;">NNE IoT Box</div>
+                <hr style="width: 95%; height:1px; background-color: white; border:0">
+                {% for i in range(8) %}
+                    <div class="port">
+                        <span class="dot-large" id="on" style="margin-left: 34px; margin-right: 34px; margin-bottom: 5px;"></span>
+                        <span style="padding-top: 3px; padding-bottom: 3px; min-width: 60px; margin-left: 15px; margin-right: 15px; text-align: center; background-color: white;"><b>{{ i+1 }}</b></span>
+                    </div>
+                {% endfor %}
+            </div>
+            <p style="text-align: justify; padding: 0 10px;">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec id porta ex, eget cursus massa. Quisque ac blandit nulla. Phasellus congue a augue vel dapibus. Vestibulum euismod diam a orci varius volutpat. Pellentesque a ante nisi. Pellentesque consequat justo dui, non pretium purus rhoncus ac. Duis finibus semper viverra. Etiam bibendum, turpis eu congue eleifend, justo mi gravida diam, at scelerisque turpis tellus at risus.</p>
+            <ul>
+                <li>OPC-UA Connectivity</li>
+                <li>Port connections</li>
+            </ul>
+            Smart text here also
+            <!--<div style="position: absolute; right: 5px; top: 5px; background-color: #25303B; width: 400px; height: 170px; border-radius: 20px;">
+                <div style="width: 100%; height: fit-content; padding-top: 5px; color:white; text-align: center; font-weight: bold;">NNE IoT Box</div>
+                <hr style="width: 95%; height:1px; background-color: white; border:0">
+                {% for i in range(8) %}
+                    <div class="port">
+                        <span class="dot-large" id="on" style="margin-left: 34px; margin-right: 34px; margin-bottom: 5px;"></span>
+                        <span style="padding-top: 3px; padding-bottom: 3px; min-width: 60px; margin-left: 15px; margin-right: 15px; text-align: center; background-color: white;"><b>{{ i+1 }}</b></span>
+                    </div>
+                {% endfor %}
+            </div>-->
+        </div>
+    </div>
+{% endblock %}
+{% block scripts %}
+    {{ super() }}
+{% endblock %}

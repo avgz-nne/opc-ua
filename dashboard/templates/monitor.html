@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block head %}
+    {{ super() }}
+{% endblock %}
+{% block nav %}
+    {{ super() }}
+    <style>
+        #nav-monitor {
+            color: #E22C4A;
+        }
+    </style>
+{% endblock %}
+{% block content %}
+    <div class="content">
+        {% for port in connections %}
+            {% if port["name"] != "none" %}
+                <button class="collapsible">
+                    <span class="dot" id="on"></span>
+                    <b>{{ port["name"]}}</b>
+                </button>
+                <div class="coll-content">
+                    much text
+                </div>
+            {% else %}
+                <button class="ncollapsible">
+                    <span class="dot" id="off"></span>
+                    <b>Not Connected</b>
+                </button>
+                <div class="coll-content", style="max-height: 1000px">
+                    <p class="ip">Port {{ port["port"] }} does not have a sensor connected to it or the sensor is not recognized.</p>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+{% endblock %}
+{% block scripts %}
+    {{ super() }}
+{% endblock %}

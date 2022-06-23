@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
+import logging
 import re
 import xml.etree.ElementTree as ET
 
-from information_point import InformationPoint
-from iodd_help_functions import iodd_unitcodes
+from iodd.information_point import InformationPoint
+from iodd.iodd_help_functions import iodd_unitcodes
 
 
 @dataclass
@@ -132,7 +133,8 @@ class IODD:
                 information_point.up_val = up_val
 
             self.information_points.append(information_point)
-
+        for ip in self.information_points:
+            logging.info(f"{ip.name}, {ip.bit_offset}")
         for menu in menus:
             if any(
                 [
@@ -142,7 +144,10 @@ class IODD:
                     for unit in dict_unit_codes_SI.keys()
                 ]
             ):
+                logging.info(f"{information_point.name}: {menu.get('id')}")
                 record_item_ref = menu.find(f"./{self.iodd_schema}RecordItemRef")
+                if record_item_ref is None:
+                    continue
                 subindex = int(record_item_ref.get("subindex"))
                 for idx, information_point in enumerate(self.information_points):
                     if information_point.subindex == subindex:

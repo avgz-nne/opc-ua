@@ -245,6 +245,6 @@ def iodd_scraper(
 # For testing, should be deleted at some point or moved to module description
 from pprint import pprint
 
-iodds = iodd_scraper(["OGH283", "O6H707", "O6H707"])
-pprint(iodds)
+iodds = iodd_scraper(["OGD592"])
+#pprint(iodds)
 #iodds = [iodd_to_value_index(iodd) for iodd in iodds]

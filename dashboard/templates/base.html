@@ -1,0 +1,67 @@
+<html style="padding: 5px;">
+    <head>
+        {% block head %}
+        <title>{% block title %}NNE - IoT Box Dashboard{% endblock %}</title>
+        <link rel="stylesheet" href="../static/style.css">
+        <script src="../node_modules/feather-icons/dist/feather.js"></script>
+        {% endblock %}
+    </head>
+    <body bgcolor="white", style="width:min-content; margin: auto; color: #25303B">
+        {% block nav %}
+        <nav class="menu">
+            <a href="/home">
+                <span class="nav-text" id="nav-home">
+                    <i data-feather="home"></i>
+                    <span>Home</span>
+                </span>
+            </a>
+            <hr class="vr">
+            <a href="/monitor">
+                <span class="nav-text" id="nav-monitor">
+                    <i data-feather="activity"></i>
+                    <span>Monitor</span>
+                </span>
+            </a>
+            <hr class="vr">
+            <a href="/collection">
+                <span class="nav-text" id="nav-collection">
+                    <i data-feather="database"></i>
+                    <span>IODD-Collection</span>
+                </span>
+            </a>
+            <hr class="vr">
+            <a href="/settings">
+                <span class="nav-text" id="nav-settings">
+                    <i data-feather="settings"></i>
+                    <span>Settings</span>
+                </span>
+            </a>
+            <img src="../img/NNE_White.png" alt="NNE LOGO", height="50px" style="float:right">
+        </nav>
+        {% endblock %}
+        {% block content %}
+        <div class="content">N/A</div>
+        {% endblock %}
+    </body>
+    {% block scripts %}
+    <script>
+        feather.replace()
+    </script>
+    <script>
+        var coll = document.getElementsByClassName("collapsible");
+        var i;
+
+        for (i = 0; i <coll.length; i++) {
+            coll[i].addEventListener("click", function() {
+                this.classList.toggle("active");
+                var content = this.nextElementSibling;
+                if (content.style.maxHeight) {
+                    content.style.maxHeight = null;
+                } else {
+                    content.style.maxHeight = content.scrollHeight + "px";
+                };
+            });
+        };
+    </script>
+    {% endblock %}
+</html>
