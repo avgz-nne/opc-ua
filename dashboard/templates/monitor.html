@@ -12,11 +12,11 @@
 {% endblock %}
 {% block content %}
     <div class="content">
-        {% for port in connections %}
-            {% if port["name"] != "none" %}
+        {% for port in ports %}
+            {% if port["name"] != "N/A" %}
                 <button class="collapsible">
                     <span class="dot" id="on"></span>
-                    <b>{{ port["name"]}}</b>
+                    <b>{{ port["name"] }}</b>
                 </button>
                 <div class="coll-content">
                     much text
@@ -24,10 +24,10 @@
             {% else %}
                 <button class="ncollapsible">
                     <span class="dot" id="off"></span>
-                    <b>Not Connected</b>
+                    <b>{{ port["name"] }}</b>
                 </button>
                 <div class="coll-content", style="max-height: 1000px">
-                    <p class="ip">Port {{ port["port"] }} does not have a sensor connected to it or the sensor is not recognized.</p>
+                    <p class="ip">Port {{ port["port"]+1 }} does not have a sensor connected to it or the sensor is not recognized.</p>
                 </div>
             {% endif %}
         {% endfor %}

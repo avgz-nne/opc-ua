@@ -17,10 +17,10 @@
             <div style="float: right; background-color: #25303B; width: 400px; height: 170px; border-radius: 20px; margin-left: 10px;">
                 <div style="width: 100%; height: fit-content; padding-top: 5px; color:white; text-align: center; font-weight: bold;">NNE IoT Box</div>
                 <hr style="width: 95%; height:1px; background-color: white; border:0">
-                {% for i in range(8) %}
+                {% for port in ports %}
                     <div class="port">
-                        <span class="dot-large" id="on" style="margin-left: 34px; margin-right: 34px; margin-bottom: 5px;"></span>
-                        <span style="padding-top: 3px; padding-bottom: 3px; min-width: 60px; margin-left: 15px; margin-right: 15px; text-align: center; background-color: white;"><b>{{ i+1 }}</b></span>
+                        <span class="dot-large" id={{ "on" if port["name"] != "N/A" else "off" }} style="margin-left: 34px; margin-right: 34px; margin-bottom: 5px;"></span>
+                        <span style="padding-top: 3px; padding-bottom: 3px; min-width: 60px; margin-left: 15px; margin-right: 15px; text-align: center; background-color: white;"><b>{{ port["port"]+1 }}</b></span>
                     </div>
                 {% endfor %}
             </div>
@@ -30,6 +30,7 @@
                 <li>Port connections</li>
             </ul>
             Smart text here also
+            <span id="changeme"></span>
             <!--<div style="position: absolute; right: 5px; top: 5px; background-color: #25303B; width: 400px; height: 170px; border-radius: 20px;">
                 <div style="width: 100%; height: fit-content; padding-top: 5px; color:white; text-align: center; font-weight: bold;">NNE IoT Box</div>
                 <hr style="width: 95%; height:1px; background-color: white; border:0">
@@ -45,4 +46,16 @@
 {% endblock %}
 {% block scripts %}
     {{ super() }}
+    <script>
+        const val = document.getElementById("changeme")
+        setInterval(() => {
+            fetch("/value").then(function(response) {
+                return response.json();
+            }).then(function(data) {
+                console.log(data)
+                val.textContent = data["value"]
+            });
+        }, 5000);
+        
+    </script>
 {% endblock %}

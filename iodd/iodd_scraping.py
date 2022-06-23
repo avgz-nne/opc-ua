@@ -37,10 +37,10 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
-from iodd import IODD
-from iodd_help_functions import update_iodd_collection
+from iodd.iodd import IODD
+from iodd.iodd_help_functions import update_iodd_collection
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -108,9 +108,9 @@ def iodd_scraper(
 
     # Configuring the browser used with Selenium
     browser_options = Options()
-    browser_options.headless = True
+    #browser_options.headless = True
     prefs = {"download.default_directory": os.path.join(cwd, ".tmp")}
-    browser_options.add_experimental_option("excludeSwitches", ["enable-logging"])
+    #browser_options.add_experimental_option("excludeSwitches", ["enable-logging"])
     browser_options.add_experimental_option("prefs", prefs)
     driver = None
 
@@ -163,8 +163,8 @@ def iodd_scraper(
         )
         # Only need to start the driver if it is actually necessary
         if driver is None:
-            driver = webdriver.Chrome(
-                service=Service(executable_path=ChromeDriverManager().install()),
+            driver = webdriver.Edge(
+                service=Service(executable_path=EdgeChromiumDriverManager().install()),
                 options=browser_options,
             )
             driver.implicitly_wait(10)
@@ -243,8 +243,6 @@ def iodd_scraper(
 
  
 # For testing, should be deleted at some point or moved to module description
-from pprint import pprint
 
-iodds = iodd_scraper(["OGD592"])
 #pprint(iodds)
 #iodds = [iodd_to_value_index(iodd) for iodd in iodds]

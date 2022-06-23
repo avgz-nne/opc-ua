@@ -6,9 +6,29 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 import uvicorn
 
 from iodd.iodd import IODD
+
+from asyncua import Client
+
+class Pitem(BaseModel):
+    value: int
+
+
+async def check_ports():
+    connected_ports = [{"port": i, "name": None} for i in range(8)]
+    async with Client(url="opc.tcp://192.168.1.250:4840") as client:
+        for i in range(8):
+            node = client.get_node(f"ns=1;s=IOLM/Port {i+1}/Attached Device/Product Name")
+            try:
+                name = await node.read_value()
+                connected_ports[i]["name"] = name
+            except Exception:
+                connected_ports[i]["name"] = "N/A"
+
+    return connected_ports
 
 
 app = FastAPI()
@@ -36,23 +56,15 @@ async def index(request: Request):
 @app.get("/home", response_class=HTMLResponse)
 async def home(request: Request):
     """Return homepage."""
-    return templates.TemplateResponse("home.html", {"request": request})
+    connected_ports = await check_ports()
+    return templates.TemplateResponse("home.html", {"request": request, "ports": connected_ports})
 
 
 @app.get("/monitor", response_class=HTMLResponse)
 async def monitor(request: Request):
     """Return monitoring page."""
-    connections = [
-        {"port": 1, "name": "ABC123"},
-        {"port": 2, "name": "ABC123"},
-        {"port": 3, "name": "ABC123"},
-        {"port": 4, "name": "ABC123"},
-        {"port": 5, "name": "ABC123"},
-        {"port": 6, "name": "ABC123"},
-        {"port": 7, "name": "none"},
-        {"port": 8, "name": "ABC123"},
-    ]
-    return templates.TemplateResponse("monitor.html", {"request": request, "connections": connections})
+    connected_ports = await check_ports()
+    return templates.TemplateResponse("monitor.html", {"request": request, "ports": connected_ports})
 
 
 @app.get("/collection", response_class=HTMLResponse)
@@ -76,6 +88,14 @@ async def collection(request: Request):
 async def settings(request: Request):
     """Return settings page."""
     return templates.TemplateResponse("settings.html", {"request": request})
+
+val = -1
+
+@app.get("/value", response_model=Pitem)
+async def value(request: Request):
+    global val
+    val += 1
+    return Pitem(value=val)
 
 
 if __name__ == "__main__":
