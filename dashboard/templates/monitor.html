@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block head %}
     {{ super() }}
+    <script src="https://cdn.plot.ly/plotly-2.12.1.min.js"></script>
 {% endblock %}
 {% block nav %}
     {{ super() }}
@@ -22,12 +23,13 @@
                     much text
                 </div>
             {% else %}
-                <button class="ncollapsible">
+                <button class="collapsible">
                     <span class="dot" id="off"></span>
                     <b>{{ port["name"] }}</b>
                 </button>
                 <div class="coll-content", style="max-height: 1000px">
                     <p class="ip">Port {{ port["port"]+1 }} does not have a sensor connected to it or the sensor is not recognized.</p>
+                    <div id={{ "gd" ~ port["port"] }}></div>
                 </div>
             {% endif %}
         {% endfor %}
@@ -35,4 +37,25 @@
 {% endblock %}
 {% block scripts %}
     {{ super() }}
+    <script>
+        {% for port in ports %}
+            Plotly.newPlot({{ "gd" ~ port["port"] }}, /* JSON object */ {
+                "data": [
+                    { "y": [1, 2, 3] },
+                    { "y": [3, 2, 1] }
+                ],
+                "layout": {
+                    "width": 600,
+                    "height": 400,
+                    "margin": {
+                        "t": 20,
+                        "b": 20,
+                        "l": 20,
+                        "r": 20
+                    },
+                    "paper_bgcolor": "#D2D2D2",
+                }
+            })
+        {% endfor %}
+    </script>
 {% endblock %}

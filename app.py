@@ -18,8 +18,8 @@ class Pitem(BaseModel):
 
 
 async def check_ports():
-    connected_ports = [{"port": i, "name": None} for i in range(8)]
-    async with Client(url="opc.tcp://192.168.1.250:4840") as client:
+    connected_ports = [{"port": i, "name": "N/A"} for i in range(8)]
+    """async with Client(url="opc.tcp://192.168.1.250:4840") as client:
         for i in range(8):
             node = client.get_node(f"ns=1;s=IOLM/Port {i+1}/Attached Device/Product Name")
             try:
@@ -27,6 +27,8 @@ async def check_ports():
                 connected_ports[i]["name"] = name
             except Exception:
                 connected_ports[i]["name"] = "N/A"
+    """
+    
 
     return connected_ports
 
