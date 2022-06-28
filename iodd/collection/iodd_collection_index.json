@@ -1,24 +1,23 @@
 [
     {
         "family": [
-            "OGD592",
-            "OGD593"
-        ],
-        "file": "C:\\Users\\SPQL\\Documents\\IoT_knowledge_base\\opc-ua\\iodd\\collection\\ifm-0003f4-20180314-IODD1.1.xml"
-    },
-    {
-        "family": [
             "O6H706",
             "O6H707",
             "O6H708"
         ],
-        "file": "C:\\Users\\SPQL\\Documents\\IoT_knowledge_base\\opc-ua\\iodd\\collection\\ifm-000402-20180319-IODD1.1.xml"
+        "file": "C:\\Users\\NNE IoT\\Documents\\opc-ua\\iodd\\collection\\ifm-000402-20180319-IODD1.1.xml"
     },
     {
         "family": [
             "OGH283",
             "OGH383"
         ],
-        "file": "C:\\Users\\SPQL\\Documents\\IoT_knowledge_base\\opc-ua\\iodd\\collection\\ifm-000473-20190312-IODD1.1.xml"
+        "file": "C:\\Users\\NNE IoT\\Documents\\opc-ua\\iodd\\collection\\ifm-000473-20190312-IODD1.1.xml"
+    },
+    {
+        "family": [
+            "VVB021"
+        ],
+        "file": "C:\\Users\\NNE IoT\\Documents\\opc-ua\\iodd\\collection\\ifm-0004EA-20200110-IODD1.1.xml"
     }
 ]

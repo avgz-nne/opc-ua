@@ -11,48 +11,41 @@
     </style>
 {% endblock %}
 {% block content %}
-    <div class="content">
+    <div class="content" id="c">
         <div class="text-content">
             <h3 class="coll-content-header">NNE IoT Box</h3>
             <div style="float: right; background-color: #25303B; width: 400px; height: 170px; border-radius: 20px; margin-left: 10px;">
                 <div style="width: 100%; height: fit-content; padding-top: 5px; color:white; text-align: center; font-weight: bold;">NNE IoT Box</div>
                 <hr style="width: 95%; height:1px; background-color: white; border:0">
-                {% for port in ports %}
+                {% for port in ports["numbers"] %}
                     <div class="port">
-                        <span class="dot-large" id={{ "on" if port["name"] != "N/A" else "off" }} style="margin-left: 34px; margin-right: 34px; margin-bottom: 5px;"></span>
-                        <span style="padding-top: 3px; padding-bottom: 3px; min-width: 60px; margin-left: 15px; margin-right: 15px; text-align: center; background-color: white;"><b>{{ port["port"]+1 }}</b></span>
+                        <span class="dot-large" id={{ "port" ~ port }} style="margin-left: 34px; margin-right: 34px; margin-bottom: 5px; background-color: #E22C4A;"></span>
+                        <span style="padding-top: 3px; padding-bottom: 3px; min-width: 60px; margin-left: 15px; margin-right: 15px; text-align: center; background-color: white;"><b>{{ port }}</b></span>
                     </div>
                 {% endfor %}
             </div>
             <p style="text-align: justify; padding: 0 10px;">
                 Have you ever asked yourself: How can I make something that's really cool, but ultimately not that useful? No? Well I have. And I made this dashboard. You can look at all the IODD files in your collection. You can also look at the connected ports of the box, that probably is infront of you anyway. But you can look at a shabby digital version of it too! And also look at the current values from the sensor outputs. That one is actually quite neat. You could make a more flexible dashboard with Grafana. But that wouldn't be as cool as doing it yourself, rigth? Right? Right?
             </p>
-            <span id="changeme"></span>
-            <!--<div style="position: absolute; right: 5px; top: 5px; background-color: #25303B; width: 400px; height: 170px; border-radius: 20px;">
-                <div style="width: 100%; height: fit-content; padding-top: 5px; color:white; text-align: center; font-weight: bold;">NNE IoT Box</div>
-                <hr style="width: 95%; height:1px; background-color: white; border:0">
-                {% for i in range(8) %}
-                    <div class="port">
-                        <span class="dot-large" id="on" style="margin-left: 34px; margin-right: 34px; margin-bottom: 5px;"></span>
-                        <span style="padding-top: 3px; padding-bottom: 3px; min-width: 60px; margin-left: 15px; margin-right: 15px; text-align: center; background-color: white;"><b>{{ i+1 }}</b></span>
-                    </div>
-                {% endfor %}
-            </div>-->
         </div>
     </div>
 {% endblock %}
 {% block scripts %}
     {{ super() }}
     <script>
-        const val = document.getElementById("changeme")
         setInterval(() => {
-            fetch("/value").then(function(response) {
-                return response.json();
+            fetch("/opcua/port_connectivity").then(function(response) {
+                return response.json()
             }).then(function(data) {
-                console.log(data)
-                val.textContent = data["value"]
-            });
-        }, 5000);
-        
+                for (var i = 1; i <= 8; i++) {
+                    dot = document.getElementById("port"+i)
+                    if (data["names"][i-1] === "N/A") {
+                        dot.style.background = "#E22C4A"
+                    } else {
+                        dot.style.background = "#5EBC5E"
+                    }
+                }
+            })
+        }, 1000);
     </script>
 {% endblock %}

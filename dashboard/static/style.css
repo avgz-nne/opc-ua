@@ -97,18 +97,11 @@ span.dot {
 span.dot-large {
     height: 20px;
     width: 20px;
+    background: solid #E22C4A;
     border-radius: 50%;
     border: 1px solid #FFFFFF;
     display: inline-flex;
     float: left;
-}
-
-#on {
-    background-color: #5EBC5E;
-}
-
-#off {
-    background-color: #E22C4A;
 }
 
 input::placeholder {

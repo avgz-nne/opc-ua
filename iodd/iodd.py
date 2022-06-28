@@ -4,7 +4,7 @@ import re
 import xml.etree.ElementTree as ET
 
 from iodd.information_point import InformationPoint
-from iodd.iodd_help_functions import iodd_unitcodes
+from iodd.iodd_helpers import iodd_unitcodes
 
 
 @dataclass
@@ -53,13 +53,10 @@ class IODD:
         )
         total_bit_length = int(records.get("bitLength"))
         self.total_bit_length = total_bit_length
-        self.parse_information_points()
+        self.parse_information_points(root)
 
-    def parse_information_points(self) -> None:
+    def parse_information_points(self, root: ET) -> None:
         """Parse information points from IODD file to IODD object."""
-        tree = ET.parse(self.iodd_file_location)
-        root = tree.getroot()
-
         elements_with_unitcode = root.findall(f".//{self.iodd_schema}*[@unitCode]")
         unitcodes_input = []
         for element in elements_with_unitcode:
@@ -144,7 +141,7 @@ class IODD:
                     for unit in dict_unit_codes_SI.keys()
                 ]
             ):
-                logging.info(f"{information_point.name}: {menu.get('id')}")
+                logging.info(f"Menu: {menu.get('id')}")
                 record_item_ref = menu.find(f"./{self.iodd_schema}RecordItemRef")
                 if record_item_ref is None:
                     continue

@@ -37,10 +37,10 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.microsoft import EdgeChromiumDriverManager
+from webdriver_manager.chrome import ChromeDriverManager
 
 from iodd.iodd import IODD
-from iodd.iodd_help_functions import update_iodd_collection
+from iodd.iodd_collection_helpers import update_iodd_collection
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -108,9 +108,9 @@ def iodd_scraper(
 
     # Configuring the browser used with Selenium
     browser_options = Options()
-    #browser_options.headless = True
+    browser_options.headless = True
     prefs = {"download.default_directory": os.path.join(cwd, ".tmp")}
-    #browser_options.add_experimental_option("excludeSwitches", ["enable-logging"])
+    browser_options.add_experimental_option("excludeSwitches", ["enable-logging"])
     browser_options.add_experimental_option("prefs", prefs)
     driver = None
 
@@ -157,14 +157,17 @@ def iodd_scraper(
                 pass
             continue
 
+        if sensor is None:
+            continue
+
         logging.info(
             f"IODD for {sensor} missing from IODD collection or to be"
             " replaced. Scraping IODDfinder."
         )
         # Only need to start the driver if it is actually necessary
         if driver is None:
-            driver = webdriver.Edge(
-                service=Service(executable_path=EdgeChromiumDriverManager().install()),
+            driver = webdriver.Chrome(
+                service=Service(executable_path=ChromeDriverManager().install()),
                 options=browser_options,
             )
             driver.implicitly_wait(10)
@@ -240,9 +243,3 @@ def iodd_scraper(
         logging.debug("Attempted to close driver, but driver was never started.")
     update_iodd_collection()
     return iodds
-
- 
-# For testing, should be deleted at some point or moved to module description
-
-#pprint(iodds)
-#iodds = [iodd_to_value_index(iodd) for iodd in iodds]

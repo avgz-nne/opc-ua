@@ -50,3 +50,39 @@ class InformationPoint:
     unit_code: Optional[int] = None
     units: Optional[str] = None
     value_indices: list[int] = None
+
+    def byte_to_real_value(
+        self, byte_values: list[int], byteorder: str = "big", signed: bool = True
+    ):
+        """Convert byte value of a sensor reading to real value.
+
+        :param byte_values: List of byte values to convert
+        :param byteorder: Indicate the order of byte values. If byte order is big, the
+        most significant byte is at the beginning of the list, defaults to "big"
+        :param signed: Whether the bytes are signed or not, defaults to True
+        """
+        # Special case for values that take up less than one 8-bit block
+        if (self.bit_length % 8 != 0) and (len(self.value_indices) == 1):
+            byte_value = int.from_bytes([byte_values[i] for i in self.value_indices], byteorder=byteorder, signed=signed)
+            bit_list = [1 if byte_value & (1 << (7 - n)) else 0 for n in range(8)]
+            start_index = 8 - (self.bit_offset + self.bit_length)
+            end_index = start_index + self.bit_length
+            return int("".join(str(i) for i in bit_list[start_index:end_index]), 2)
+        
+        if self.gradient is None:
+            gradient = 1
+        else:
+            gradient = self.gradient
+
+        if self.offset is None:
+            offset = 0
+        else:
+            offset = self.offset
+
+        return (
+            int.from_bytes(
+                [byte_values[i] for i in self.value_indices],
+                byteorder=byteorder,
+                signed=signed,
+            ) * gradient + offset
+        )

@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import asdict
 import json
 import os
@@ -7,31 +8,23 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
+import sqlite3
 import uvicorn
 
 from iodd.iodd import IODD
 
-from asyncua import Client
 
-class Pitem(BaseModel):
-    value: int
-
+class ConnectedPorts(BaseModel):
+    numbers: list[int]
+    names: list[str]
 
 async def check_ports():
-    connected_ports = [{"port": i, "name": "N/A"} for i in range(8)]
-    """async with Client(url="opc.tcp://192.168.1.250:4840") as client:
-        for i in range(8):
-            node = client.get_node(f"ns=1;s=IOLM/Port {i+1}/Attached Device/Product Name")
-            try:
-                name = await node.read_value()
-                connected_ports[i]["name"] = name
-            except Exception:
-                connected_ports[i]["name"] = "N/A"
-    """
-    
-
+    global con
+    global cur
+    cur.execute("SELECT * FROM connections")
+    rows = cur.fetchall()
+    connected_ports = ConnectedPorts(numbers=[row[0] for row in rows], names=[row[-1] for row in rows])
     return connected_ports
-
 
 app = FastAPI()
 
@@ -48,6 +41,8 @@ app.mount(
 
 templates = Jinja2Templates(directory="dashboard/templates")
 
+con = sqlite3.connect("connections.db")
+cur = con.cursor()
 
 @app.get("/", response_class=RedirectResponse)
 async def index(request: Request):
@@ -91,14 +86,13 @@ async def settings(request: Request):
     """Return settings page."""
     return templates.TemplateResponse("settings.html", {"request": request})
 
-val = -1
 
-@app.get("/value", response_model=Pitem)
-async def value(request: Request):
-    global val
-    val += 1
-    return Pitem(value=val)
+@app.get("/opcua/port_connectivity", response_model=ConnectedPorts)
+async def port_connectivity(request: Request):
+    return await check_ports()
 
+async def main():
+    uvicorn.run("app:app", port=80, host="0.0.0.0", reload=True)
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", port=80, host="0.0.0.0", reload=True)
+    asyncio.run(main())
