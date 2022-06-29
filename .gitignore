@@ -1,4 +1,4 @@
 __pycache__/
 iodd/__pycache__/
 dashboard/__pycache__
-*.db
+dashboard.db
