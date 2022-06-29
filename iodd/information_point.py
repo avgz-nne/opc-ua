@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 from typing import Optional
 
+# TODO: low_val and up_val should be the actual lower and upper bounds, not the min and
+# max in unconverted values
+#   -> Could do this with post init function
 
 @dataclass
 class InformationPoint:

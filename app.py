@@ -12,11 +12,23 @@ import sqlite3
 import uvicorn
 
 from iodd.iodd import IODD
+from opcua_to_sqlite import FloatList, adapt_floatlist, convert_floatlist
 
+sqlite3.register_adapter(FloatList, adapt_floatlist)
+sqlite3.register_converter("floatlist", convert_floatlist)
 
 class ConnectedPorts(BaseModel):
     numbers: list[int]
     names: list[str]
+
+class Reading(BaseModel):
+    values: list[float]
+
+async def reading():
+    global cur
+    cur.execute("SELECT readings FROM port2")
+    row = cur.fetchone()[0]
+    return Reading(values=list(row))
 
 async def check_ports():
     global con
@@ -41,7 +53,7 @@ app.mount(
 
 templates = Jinja2Templates(directory="dashboard/templates")
 
-con = sqlite3.connect("connections.db")
+con = sqlite3.connect("dashboard.db", detect_types=sqlite3.PARSE_DECLTYPES)
 cur = con.cursor()
 
 @app.get("/", response_class=RedirectResponse)
@@ -90,6 +102,10 @@ async def settings(request: Request):
 @app.get("/opcua/port_connectivity", response_model=ConnectedPorts)
 async def port_connectivity(request: Request):
     return await check_ports()
+
+@app.get("/opcua/reading", response_model=Reading)
+async def reading_request(request: Request):
+    return await reading()
 
 async def main():
     uvicorn.run("app:app", port=80, host="0.0.0.0", reload=True)

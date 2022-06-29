@@ -27,6 +27,7 @@
             <p style="text-align: justify; padding: 0 10px;">
                 Have you ever asked yourself: How can I make something that's really cool, but ultimately not that useful? No? Well I have. And I made this dashboard. You can look at all the IODD files in your collection. You can also look at the connected ports of the box, that probably is infront of you anyway. But you can look at a shabby digital version of it too! And also look at the current values from the sensor outputs. That one is actually quite neat. You could make a more flexible dashboard with Grafana. But that wouldn't be as cool as doing it yourself, rigth? Right? Right?
             </p>
+            <span id="changeme"></span>
         </div>
     </div>
 {% endblock %}
@@ -34,18 +35,12 @@
     {{ super() }}
     <script>
         setInterval(() => {
-            fetch("/opcua/port_connectivity").then(function(response) {
+            fetch("/opcua/reading").then(function(response) {
                 return response.json()
             }).then(function(data) {
-                for (var i = 1; i <= 8; i++) {
-                    dot = document.getElementById("port"+i)
-                    if (data["names"][i-1] === "N/A") {
-                        dot.style.background = "#E22C4A"
-                    } else {
-                        dot.style.background = "#5EBC5E"
-                    }
-                }
-            })
+                span = document.getElementById("changeme")
+                span.textContent = data["values"]
+            });
         }, 1000);
     </script>
 {% endblock %}
