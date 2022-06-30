@@ -7,22 +7,15 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
 import sqlite3
+from pydantic import BaseModel
 import uvicorn
 
 from iodd.iodd import IODD
-from opcua_to_sqlite import FloatList, adapt_floatlist, convert_floatlist
+from sqlite_extension import register_list_types
+from dashboard.src.data_models import ConnectedPorts, Reading
 
-sqlite3.register_adapter(FloatList, adapt_floatlist)
-sqlite3.register_converter("floatlist", convert_floatlist)
-
-class ConnectedPorts(BaseModel):
-    numbers: list[int]
-    names: list[str]
-
-class Reading(BaseModel):
-    values: list[float]
+register_list_types()
 
 async def reading():
     global cur
@@ -52,6 +45,7 @@ app.mount(
 )
 
 templates = Jinja2Templates(directory="dashboard/templates")
+templates.env.globals.update(zip=zip)
 
 con = sqlite3.connect("dashboard.db", detect_types=sqlite3.PARSE_DECLTYPES)
 cur = con.cursor()
@@ -106,6 +100,25 @@ async def port_connectivity(request: Request):
 @app.get("/opcua/reading", response_model=Reading)
 async def reading_request(request: Request):
     return await reading()
+
+class Line(BaseModel):
+    x: list[list[float]]
+    y: list[list[float]]
+
+import math
+
+x = [i for i in range(100)]
+y = [math.sin(i/50) for i in x]
+
+@app.get("/random", response_model=Line)
+async def randomvals(request: Request):
+    global x, y
+    x.append(x[-1] + 1)
+    x.pop(0)
+    y.append(math.sin(x[-1]/50))
+    y.pop(0)
+    return Line(x=[x, x], y=[y, [-i for i in y]])
+
 
 async def main():
     uvicorn.run("app:app", port=80, host="0.0.0.0", reload=True)

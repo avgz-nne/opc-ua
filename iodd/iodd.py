@@ -166,6 +166,9 @@ class IODD:
                         self.information_points[idx].units = dict_unit_codes_SI[
                             int(unitcode) if unitcode is not None else unitcode
                         ]
+        for i, _ in enumerate(self.information_points):
+            self.information_points[i].convert_display_format()
+            self.information_points[i].convert_bounds()
         self.iodd_to_value_index()
 
     def iodd_to_value_index(self, block_length: int = 8) -> None:

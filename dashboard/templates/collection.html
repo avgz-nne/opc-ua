@@ -13,14 +13,14 @@
 {% block content %}
     <div class="content">
         {% for iodd in iodds %}
-        <button class="collapsible">{{ iodd["iodd_file_location"].split("\\")[-1] }}</button>
+        <button class="collapsible"><b>{{ iodd["iodd_file_location"].split("\\")[-1] }}</b></button>
         <div class="coll-content">
             <h3 class="coll-content-header">General Information</h3>
             <p class="ip"><b>Family: </b>{{ "; ".join(iodd["family"]) }}</p>
             <p class="ip"><b>File location: </b>{{ iodd["iodd_file_location"] }}</p>
             <h3 class="coll-content-header">Information Points</h3>
             {% for ip in iodd["information_points"] %}
-                <p class="ip"><b>> {{ ip["name"] }}: </b>{{ ip["low_val"] }} - {{ ip["up_val"] }} {{ ip["units"] }}</p>
+                <p class="ip"><b>> {{ ip["name"] }}: </b>[{{ ip["low_val"] }} ; {{ ip["up_val"] }}] {{ ip["units"] }}</p>
             {% endfor %}
         </div>
         {% endfor %}

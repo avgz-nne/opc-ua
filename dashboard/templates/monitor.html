@@ -13,23 +13,31 @@
 {% endblock %}
 {% block content %}
     <div class="content">
-        {% for port in ports %}
-            {% if port["name"] != "N/A" %}
+        {% for port, name in zip(ports["numbers"], ports["names"]) %}
+            {% if name != "N/A" %}
                 <button class="collapsible">
                     <span class="dot" id="on"></span>
-                    <b>{{ port["name"] }}</b>
+                    <b>{{ name }}</b>
                 </button>
                 <div class="coll-content">
-                    much text
+                    <button class="startstop" id="start">
+                        <i data-feather="play"></i>
+                        Start
+                    </button>
+                    <button class="startstop" id="stop">
+                        <i data-feather="pause"></i>
+                        Pause
+                    </button>
+                    <div id="extra"></div>
                 </div>
             {% else %}
                 <button class="collapsible">
                     <span class="dot" id="off"></span>
-                    <b>{{ port["name"] }}</b>
+                    <b>{{ name }}</b>
                 </button>
-                <div class="coll-content", style="max-height: 1000px">
-                    <p class="ip">Port {{ port["port"]+1 }} does not have a sensor connected to it or the sensor is not recognized.</p>
-                    <div id={{ "gd" ~ port["port"] }}></div>
+                <div class="coll-content">
+                    <p class="ip">Port {{ port }} does not have a sensor connected to it or the sensor is not recognized.</p>
+                    <!--<div id={{ "gd" ~ port }}></div>-->
                 </div>
             {% endif %}
         {% endfor %}
@@ -38,8 +46,8 @@
 {% block scripts %}
     {{ super() }}
     <script>
-        {% for port in ports %}
-            Plotly.newPlot({{ "gd" ~ port["port"] }}, /* JSON object */ {
+        {% for port in ports["numbers"] %}
+            Plotly.newPlot({{ "gd" ~ port }}, /* JSON object */ {
                 "data": [
                     { "y": [1, 2, 3] },
                     { "y": [3, 2, 1] }
@@ -58,4 +66,59 @@
             })
         {% endfor %}
     </script>
+    <script>
+        Plotly.newPlot("extra", /* JSON object */ {
+                "data": [
+                    { "x": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], "y": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] },
+                    { "x": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], "y": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
+                ],
+                "layout": {
+                    "width": 600,
+                    "height": 400,
+                    "margin": {
+                        "t": 20,
+                        "b": 20,
+                        "l": 20,
+                        "r": 20
+                    },
+                    "yaxis": {
+                        "range": [-1.1, 1.1]
+                    },
+                    "paper_bgcolor": "#D2D2D2",
+                }
+            })
+    </script>
+    <script>
+        var timer = null, interval = 1000/30;
+
+        var start = document.getElementById("start")
+        var stop = document.getElementById("stop")
+
+        start.addEventListener("click", function() {
+            if (timer !== null) return;
+            timer = setInterval(() => {
+                fetch("/random").then(function(response) {
+                    return response.json()
+                }).then(function(data) {
+                    div = document.getElementById("extra")
+                    var update = {
+                        x: [
+                            data["x"][0],
+                            data["x"][1]
+                        ], y: [
+                            data["y"][0],
+                            data["y"][1]
+                        ]};
+                    Plotly.restyle(extra, update, [0, 1]);
+                })
+            }, interval);
+        })
+
+        stop.addEventListener("click", function() {
+            clearInterval(timer);
+            timer = null;
+        })
+        
+    </script>
+    
 {% endblock %}
