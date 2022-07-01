@@ -4,3 +4,8 @@ Encountered error - User: arn:aws:iam::419458780298:user/AVGZ is not authorized 
 Encountered error - User: arn:aws:iam::419458780298:user/AVGZ is not authorized to perform: iam:GetPolicy on resource: policy arn:aws:iam::419458780298:policy/GreengrassV2TokenExchangeRoleAccess because no identity-based policy allows the iam:GetPolicy action (Service: Iam, Status Code: 403, Request ID: 889468ab-d5e4-40a2-b9fd-219ceef30046, Extended Request ID: null); No permissions to lookup IAM policy, will attempt creating one. If you wish to use an existing policy instead, please make sure the credentials used for setup have iam::getPolicy permissions for the policy resource and retry...
 Error while trying to setup Greengrass Nucleus
 software.amazon.awssdk.services.iam.model.EntityAlreadyExistsException: A policy called GreengrassV2TokenExchangeRoleAccess already exists. Duplicate names are not allowed.
+
+2---------
+Encountered error - User: arn:aws:iam::419458780298:user/AVGZ is not authorized to perform: iam:GetPolicy on resource: policy arn:aws:iam::aws:policy/GreengrassV2TokenExchangeRoleAccess because no identity-based policy allows the iam:GetPolicy action (Service: Iam, Status Code: 403, Request ID: c4f9100d-95a0-4ce0-9422-a29e0191c637, Extended Request ID: null); No permissions to lookup managed policy, looking for a user defined policy...
+IAM policy named "GreengrassV2TokenExchangeRoleAccess" already exists. Please attach it to the IAM role if not already
+
